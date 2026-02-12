@@ -25,7 +25,7 @@
         </div>
         <div class="flex gap-2">
             <button id="btnConnect" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold transition-colors">
-                Verbinden
+                Verbinden (Alle anzeigen)
             </button>
             <button id="btnDisconnect" class="bg-red-900 hover:bg-red-700 text-gray-300 px-4 py-2 rounded font-bold hidden transition-colors">
                 Trennen
@@ -193,8 +193,8 @@
         // --- BLUETOOTH VARIABLES ---
         let device, server, service;
         let charWrite, charNotify;
-        const SERVICE_UUID = "0000ff60-0000-1000-8000-00805f9b34fb"; // Assuming standard base? Or 16 bit
-        // Actually, screenshot showed just 0xFF60. Let's try short UUID first, browser handles full.
+        // NOTE: We use the Full 128-bit UUID here to be safe, but we scan for EVERYTHING.
+        const SERVICE_UUID = "0000ff60-0000-1000-8000-00805f9b34fb";
         const CHAR_WRITE_UUID = 0xFF61; 
         const CHAR_NOTIFY_UUID = 0xFF62;
 
@@ -236,11 +236,11 @@
 
         btnConnect.addEventListener('click', async () => {
             try {
-                log("Scanning for devices with service 0xFF60...");
+                // FIXED: Changed to acceptAllDevices because the device might not advertise 0xFF60
+                log("Scanning for ALL devices...");
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: false,
-                    filters: [{ services: [0xFF60] }], // The "Unknown Service"
-                    optionalServices: [0xFF60]
+                    acceptAllDevices: true, 
+                    optionalServices: [0xFF60, SERVICE_UUID] // Must list services to access them later
                 });
 
                 document.getElementById('deviceName').textContent = device.name || "Unnamed Device";
@@ -250,7 +250,13 @@
                 server = await device.gatt.connect();
 
                 log(`Getting Service 0xFF60...`);
-                service = await server.getPrimaryService(0xFF60);
+                // Try getting service by short or long UUID
+                try {
+                    service = await server.getPrimaryService(0xFF60);
+                } catch(e) {
+                     log("Short UUID failed, trying long...");
+                     service = await server.getPrimaryService(SERVICE_UUID);
+                }
 
                 log(`Getting Characteristics...`);
                 charWrite = await service.getCharacteristic(0xFF61);
@@ -304,9 +310,6 @@
             const flag = parseInt(document.getElementById('flagSelect').value, 16);
             const grp = parseInt(document.getElementById('groupIdInput').value, 16);
             
-            // Length = Grp(1) + Flag(1) + Cmd1(1) + Cmd2(1) + PayloadLen + CRC(0, accounted for in logic usually but let's stick to C# logic)
-            // C# Logic: response.WriteByte((byte)(payload.Length + 5)); 
-            // 5 comes from: Grp, Flag, C1, C2, CRC.
             const len = payloadBytes.length + 5; 
 
             const packet = [0xFC, len, grp, flag, cmd1, cmd2, ...payloadBytes];
@@ -320,9 +323,6 @@
             // 3. Send
             log(toHexString(new DataView(data.buffer)), 'tx');
             try {
-                // If flag is 0x01 (No Response), ideally we use writeValueWithoutResponse if available, 
-                // but standard WebBT API handles this via properties. 
-                // We just use writeValue and hope the stack handles the flag logic on UDP layer mostly.
                 await charWrite.writeValue(data);
             } catch (e) {
                 log("Write Failed: " + e, 'error');
@@ -353,18 +353,14 @@
         
         // 1. Discovery: Cmd 01 0A, Flag 30 (Broadcast?), Grp FF
         document.getElementById('btnMacroDiscovery').addEventListener('click', () => {
-            // Temporary Override UI for this macro
             const oldFlag = document.getElementById('flagSelect').value;
             const oldGrp = document.getElementById('groupIdInput').value;
             
             document.getElementById('flagSelect').value = "0x30";
-            document.getElementById('groupIdInput').value = "FF"; // Broadcast Group?
+            document.getElementById('groupIdInput').value = "FF"; 
             
-            sendPacket(0x01, 0x0A, []); // No payload usually? Or checks logic.. UDPListener says payload ignored for command 266?
-            // Actually C# UDPListener: 266 = (1*256)+10. 
-            // Wait, discovery logic in C#: sendUnicastDiscovery sends: FC 05 FF 30 01 0A CRC.
+            sendPacket(0x01, 0x0A, []); 
             
-            // Restore UI (optional, maybe user wants to keep settings)
             setTimeout(() => {
                 document.getElementById('flagSelect').value = oldFlag;
                 document.getElementById('groupIdInput').value = oldGrp;
@@ -373,7 +369,6 @@
 
         // 2. Ping: Cmd 01 0B
         document.getElementById('btnMacroPing').addEventListener('click', () => {
-            // Read Status (01 0B) -> 267
             sendPacket(0x01, 0x0B, []);
         });
 
@@ -396,7 +391,6 @@
         // DANGER: Bootloader
         document.getElementById('btnBootloader').addEventListener('click', () => {
              if(confirm("ACHTUNG: Dies versetzt das Gerät in den Update-Modus. Es reagiert möglicherweise nicht mehr auf Lichtbefehle, bis es neu gestartet wird. Fortfahren?")) {
-                 // Cmd 4, 1. Payload "Ka" (0x4B, 0x61)
                  sendPacket(0x04, 0x01, [0x4B, 0x61]);
              }
         });
@@ -405,3 +399,5 @@
 </body>
 </html>
 
+
+ 
