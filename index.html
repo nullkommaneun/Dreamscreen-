@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DreamScreen BT Debugger</title>
+    <title>DreamScreen BT Brute Force</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #0f172a; color: #e2e8f0; font-family: monospace; }
         .hex-font { font-family: 'Courier New', Courier, monospace; }
-        /* Scrollbar styling */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -18,145 +17,116 @@
 <body class="h-screen flex flex-col overflow-hidden">
 
     <!-- Header -->
-    <header class="bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center shadow-lg">
+    <header class="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center shadow-lg z-10">
         <div>
-            <h1 class="text-xl font-bold text-cyan-400">DreamScreen <span class="text-slate-400">///</span> REVERSE ENGINEER</h1>
-            <p class="text-xs text-slate-500">Bluetooth LE Protocol Debugger</p>
+            <h1 class="text-xl font-bold text-red-500">DreamScreen <span class="text-white">///</span> BRUTE FORCE</h1>
+            <p class="text-xs text-slate-500">Protokoll Scanner & Debugger</p>
         </div>
         <div class="flex gap-2">
-            <button id="btnConnect" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold transition-colors">
-                Verbinden (Suche "Dream...")
+            <button id="btnConnect" class="bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded font-bold transition-all shadow-lg border border-blue-500">
+                1. VERBINDEN
             </button>
-            <button id="btnDisconnect" class="bg-red-900 hover:bg-red-700 text-gray-300 px-4 py-2 rounded font-bold hidden transition-colors">
-                Trennen
+            <button id="btnDisconnect" class="bg-slate-700 hover:bg-slate-600 text-gray-300 px-4 py-2 rounded font-bold hidden">
+                TRENNEN
             </button>
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
         
-        <!-- Controls Panel -->
-        <div class="w-full md:w-1/2 p-4 overflow-y-auto border-r border-slate-700 bg-slate-900/50">
+        <!-- Left Panel: Controls -->
+        <div class="w-full md:w-1/2 p-4 overflow-y-auto border-r border-slate-700 bg-slate-900">
             
-            <!-- Connection Status -->
-            <div id="statusPanel" class="mb-6 p-3 bg-slate-800 rounded border border-slate-700">
-                <div class="flex justify-between">
-                    <span class="text-slate-400">Status:</span>
-                    <span id="connectionStatus" class="text-red-400 font-bold">Getrennt</span>
+            <div id="statusPanel" class="mb-4 p-3 bg-slate-800 rounded border border-slate-600">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-xs uppercase">Status</span>
+                    <span id="connectionStatus" class="text-red-500 font-bold">DISCONNECTED</span>
                 </div>
-                <div class="flex justify-between mt-1">
-                    <span class="text-slate-400">Device:</span>
+                <div class="flex justify-between items-center mt-1">
+                    <span class="text-slate-400 text-xs uppercase">Device</span>
                     <span id="deviceName" class="text-slate-200">-</span>
                 </div>
-                <div class="mt-2 text-xs text-orange-400 hidden" id="scanWarning">
-                    Hinweis: Falls Liste leer, nRF Connect beenden!
-                </div>
             </div>
 
-            <!-- Settings -->
-            <div class="mb-6">
-                <h2 class="text-sm uppercase tracking-wider text-slate-500 mb-2 font-bold">Protokoll Einstellungen</h2>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Write Flag (Byte 3)</label>
-                        <select id="flagSelect" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-sm">
-                            <option value="0x01">0x01 (Silent / No Resp)</option>
-                            <option value="0x11">0x11 (Response Req)</option>
-                            <option value="0x00">0x00 (No Flags)</option>
-                            <option value="0x30">0x30 (Discovery)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Group ID (Byte 2)</label>
-                        <input type="text" id="groupIdInput" value="00" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-sm hex-font uppercase" maxlength="2">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Custom Command Builder -->
-            <div class="mb-6 p-4 bg-slate-800 rounded border border-slate-600 shadow-inner">
-                <h2 class="text-sm uppercase tracking-wider text-cyan-500 mb-3 font-bold">Custom Command Builder</h2>
+            <!-- AUTOMATIC SCANNER -->
+            <div class="mb-6 p-4 bg-slate-800/50 rounded border border-yellow-600/50 shadow-inner relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-yellow-600 text-black text-xs font-bold px-2 py-1">EMPFEHLUNG</div>
+                <h2 class="text-sm uppercase tracking-wider text-yellow-500 mb-3 font-bold">2. Protokoll Scanner</h2>
+                <p class="text-xs text-slate-400 mb-4">
+                    Sendet systematisch Pings mit verschiedenen Gruppen & Flags, bis das Gerät antwortet.
+                </p>
                 
-                <div class="grid grid-cols-2 gap-4 mb-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">CMD 1 (Category)</label>
-                        <input type="text" id="cmd1Input" value="03" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-center font-mono text-lg uppercase focus:border-cyan-500 outline-none" maxlength="2">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">CMD 2 (Action)</label>
-                        <input type="text" id="cmd2Input" value="05" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-center font-mono text-lg uppercase focus:border-cyan-500 outline-none" maxlength="2">
-                    </div>
+                <div id="scanStatus" class="hidden mb-3 text-xs font-mono p-2 bg-black border border-slate-700 text-cyan-400">
+                    Testing: Grp <span id="scanGrp">-</span> | Flag <span id="scanFlag">-</span>
                 </div>
 
-                <div class="mb-3">
-                    <label class="block text-xs text-slate-400 mb-1">Payload (Hex Bytes, Space separated)</label>
-                    <input type="text" id="payloadInput" value="FF 00 00" class="w-full bg-slate-900 border border-slate-600 rounded p-2 font-mono text-sm uppercase focus:border-cyan-500 outline-none" placeholder="z.B. FF 00 00">
-                </div>
-
-                <button id="btnSendCustom" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3 rounded shadow mt-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                    SENDEN (Auto CRC)
+                <button id="btnStartScan" class="w-full bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-3 rounded shadow transition-all border border-yellow-500 disabled:opacity-50">
+                    START BRUTE FORCE SCAN
                 </button>
             </div>
 
-            <!-- Quick Actions (Macros) -->
-            <div class="mb-6">
-                <h2 class="text-sm uppercase tracking-wider text-slate-500 mb-2 font-bold">Hack Macros</h2>
+            <!-- MANUAL CONTROLS -->
+            <div class="mb-6 opacity-50 transition-opacity" id="manualControls">
+                <h2 class="text-sm uppercase tracking-wider text-slate-500 mb-2 font-bold">Manuelle Kontrolle</h2>
+                
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <div>
+                        <label class="block text-[10px] text-slate-400 uppercase mb-1">Flag (Byte 3)</label>
+                        <select id="flagSelect" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-sm text-white">
+                            <option value="0x01">0x01 (Silent)</option>
+                            <option value="0x11">0x11 (Response)</option>
+                            <option value="0x00">0x00 (Null)</option>
+                            <option value="0x30">0x30 (Disc)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 uppercase mb-1">Group (Byte 2)</label>
+                        <input type="text" id="groupIdInput" value="00" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-sm hex-font text-white text-center" maxlength="2">
+                    </div>
+                </div>
+
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="rawPayload" value="03 05 FF 00 00" class="flex-1 bg-black border border-slate-600 rounded p-2 font-mono text-sm text-white uppercase" placeholder="CMD1 CMD2 PAYLOAD">
+                    <button id="btnSendRaw" class="bg-slate-700 hover:bg-slate-600 text-white px-4 rounded font-bold text-xs uppercase border border-slate-500">
+                        Senden
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-2 mb-4">
+                    <input type="checkbox" id="chkNoHeader" class="w-4 h-4 bg-slate-800 border-slate-600 rounded">
+                    <label for="chkNoHeader" class="text-xs text-red-400">Raw Mode (Ohne FC/CRC Header)</label>
+                </div>
+
+                <h3 class="text-xs font-bold text-slate-500 mb-2 mt-4 uppercase">Test Macros</h3>
                 <div class="grid grid-cols-1 gap-2">
-                    <button id="btnMacroDiscovery" class="bg-purple-900/50 hover:bg-purple-800 border border-purple-700 text-purple-200 py-2 px-3 rounded text-left text-sm flex justify-between items-center group">
-                        <span>1. Discovery / Handshake</span>
-                        <span class="text-xs font-mono opacity-50 group-hover:opacity-100">Cmd: 01 0A | Flag: 30</span>
+                     <button id="btnReadVersion" class="bg-blue-900/40 hover:bg-blue-800 border border-blue-800 text-blue-200 py-2 px-3 rounded text-left text-sm font-mono">
+                        READ VERSION (02 02)
                     </button>
-                    <button id="btnMacroPing" class="bg-slate-700 hover:bg-slate-600 text-white py-2 px-3 rounded text-left text-sm flex justify-between items-center">
-                        <span>2. Ping (Lebenszeichen)</span>
-                        <span class="text-xs font-mono opacity-50">Cmd: 01 0B</span>
+                    <button id="btnModeAmbient" class="bg-slate-700 hover:bg-slate-600 text-white py-2 px-3 rounded text-left text-sm font-mono">
+                        SET MODE: AMBIENT (03 01 -> 03)
                     </button>
-                    <button id="btnMacroAmbient" class="bg-slate-700 hover:bg-slate-600 text-white py-2 px-3 rounded text-left text-sm flex justify-between items-center">
-                        <span>3. Force Ambient Mode</span>
-                        <span class="text-xs font-mono opacity-50">Cmd: 03 01 -> 03</span>
-                    </button>
-                    <button id="btnMacroRed" class="bg-red-900/50 hover:bg-red-800 border border-red-700 text-red-200 py-2 px-3 rounded text-left text-sm flex justify-between items-center">
-                        <span>4. Set Color RED</span>
-                        <span class="text-xs font-mono opacity-50">Cmd: 03 05 -> FF0000</span>
-                    </button>
-                    <button id="btnMacroGreen" class="bg-green-900/50 hover:bg-green-800 border border-green-700 text-green-200 py-2 px-3 rounded text-left text-sm flex justify-between items-center">
-                        <span>Set Color GREEN</span>
-                        <span class="text-xs font-mono opacity-50">Cmd: 03 05 -> 00FF00</span>
-                    </button>
-                     <button id="btnMacroBlue" class="bg-blue-900/50 hover:bg-blue-800 border border-blue-700 text-blue-200 py-2 px-3 rounded text-left text-sm flex justify-between items-center">
-                        <span>Set Color BLUE</span>
-                        <span class="text-xs font-mono opacity-50">Cmd: 03 05 -> 0000FF</span>
+                    <button id="btnColorRed" class="bg-red-900/40 hover:bg-red-800 border border-red-800 text-red-200 py-2 px-3 rounded text-left text-sm font-mono">
+                        SET COLOR: RED (03 05 -> FF0000)
                     </button>
                 </div>
             </div>
 
-            <!-- Danger Zone -->
-            <div class="mt-8 border-t border-red-900/50 pt-4">
-                 <h2 class="text-xs uppercase tracking-wider text-red-600 mb-2 font-bold">Danger Zone</h2>
-                 <button id="btnBootloader" class="w-full bg-transparent border border-red-800 text-red-500 hover:bg-red-900/20 py-2 px-3 rounded text-xs">
-                    Enter Bootloader (Update Mode)
-                 </button>
-            </div>
         </div>
 
-        <!-- Log Panel -->
+        <!-- Right Panel: Logs -->
         <div class="w-full md:w-1/2 bg-black flex flex-col border-l border-slate-700">
-            <div class="bg-slate-800 p-2 text-xs text-slate-400 flex justify-between items-center border-b border-slate-700">
-                <span>COMMUNICATION LOG</span>
-                <button id="btnClearLog" class="text-slate-500 hover:text-white uppercase">Clear</button>
+            <div class="bg-slate-800 p-2 text-[10px] text-slate-400 flex justify-between items-center border-b border-slate-700">
+                <span>SERIAL MONITOR (0xFF62 NOTIFY ACTIVE)</span>
+                <button id="btnClearLog" class="hover:text-white">CLEAR</button>
             </div>
-            <div id="consoleLog" class="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-2">
-                <div class="text-slate-600 italic">Bereit. Stelle sicher, dass nRF Connect getrennt ist!</div>
-            </div>
-            <!-- Packet Decoder Preview (Static for now, could be dynamic) -->
-            <div class="p-2 bg-slate-900 border-t border-slate-800 text-xs text-slate-500">
-                Packet Structure: <span class="text-orange-400">FC</span> [Len] [Grp] [Flag] [C1] [C2] [Payload...] [CRC]
+            <div id="consoleLog" class="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1">
+                <div class="text-slate-600">> Warten auf Verbindung...</div>
             </div>
         </div>
     </main>
 
     <script>
-        // --- CRC TABLE & LOGIC ---
+        // --- CORE LOGIC ---
         const CRC8_TABLE = [
             0x00, 0x07, 0x0E, 0x09, 0x1C, 0x1B, 0x12, 0x15, 0x38, 0x3F, 0x36, 0x31, 0x24, 0x23, 0x2A, 0x2D,
             0x70, 0x77, 0x7E, 0x79, 0x6C, 0x6B, 0x62, 0x65, 0x48, 0x4F, 0x46, 0x41, 0x54, 0x53, 0x5A, 0x5D,
@@ -178,6 +148,8 @@
 
         function calculateCRC8(dataArray) {
             let crc = 0;
+            // Logic: length = (data[1] & 255) + 1. 
+            // Data[1] is PayloadLen+5. So Length covers Header(1)+Len(1)+Grp(1)+Flag(1)+C1(1)+C2(1)+Payload(N).
             let length = dataArray[1] + 1;
             for (let i = 0; i < length; i++) {
                 if (i >= dataArray.length) break;
@@ -188,36 +160,46 @@
             return crc;
         }
 
-        // --- BLUETOOTH VARIABLES ---
-        let device, server, service;
-        let charWrite, charNotify;
-        const SERVICE_UUID = "0000ff60-0000-1000-8000-00805f9b34fb";
-        const CHAR_WRITE_UUID = 0xFF61; 
-        const CHAR_NOTIFY_UUID = 0xFF62;
-
-        // --- UI ELEMENTS ---
-        const btnConnect = document.getElementById('btnConnect');
-        const btnDisconnect = document.getElementById('btnDisconnect');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const consoleLog = document.getElementById('consoleLog');
-        const scanWarning = document.getElementById('scanWarning');
+        // --- BLE GLOBALS ---
+        let device, charWrite, charNotify;
+        let isScanning = false;
+        let scanStopSignal = false;
         
-        // --- LOGGING ---
+        // --- SCAN CONFIGURATIONS ---
+        // Groups to test
+        const SCAN_GROUPS = [0x00, 0x01, 0x02, 0xFF];
+        // Flags to test
+        const SCAN_FLAGS = [0x00, 0x01, 0x11, 0x21, 0x30]; 
+        // Commands to test: [Cmd1, Cmd2, Payload...]
+        // 01 0B (Ping), 02 02 (Read Version), 01 0A (Discovery)
+        const SCAN_CMDS = [
+            [0x01, 0x0B],      // Ping
+            [0x02, 0x02],      // Read Version
+            [0x01, 0x0A]       // Discovery
+        ];
+
+        // --- UI BINDINGS ---
+        const btnConnect = document.getElementById('btnConnect');
+        const btnStartScan = document.getElementById('btnStartScan');
+        const consoleLog = document.getElementById('consoleLog');
+        const manualControls = document.getElementById('manualControls');
+
         function log(msg, type = 'info') {
             const el = document.createElement('div');
-            const time = new Date().toLocaleTimeString();
+            const time = new Date().toLocaleTimeString().split(' ')[0];
             el.className = 'font-mono break-all';
             
             if (type === 'tx') {
-                el.innerHTML = `<span class="text-slate-500">[${time}]</span> <span class="text-cyan-400 font-bold">TX &gt;&gt;</span> <span class="text-cyan-200">${msg}</span>`;
+                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-cyan-500">TX></span> <span class="text-cyan-200">${msg}</span>`;
             } else if (type === 'rx') {
-                 el.innerHTML = `<span class="text-slate-500">[${time}]</span> <span class="text-green-400 font-bold">RX &lt;&lt;</span> <span class="text-green-200">${msg}</span>`;
+                 el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-green-500 font-bold bg-green-900/30 px-1">RX&lt; ${msg}</span>`;
+            } else if (type === 'success') {
+                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-green-400 font-bold">!!! ${msg}</span>`;
             } else if (type === 'error') {
-                el.innerHTML = `<span class="text-slate-500">[${time}]</span> <span class="text-red-500 font-bold">ERR:</span> <span class="text-red-300">${msg}</span>`;
+                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-red-500">ERR: ${msg}</span>`;
             } else {
-                el.innerHTML = `<span class="text-slate-500">[${time}]</span> <span class="text-slate-300">${msg}</span>`;
+                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-slate-400">${msg}</span>`;
             }
-            
             consoleLog.appendChild(el);
             consoleLog.scrollTop = consoleLog.scrollHeight;
         }
@@ -230,179 +212,187 @@
             return s.trim();
         }
 
-        // --- BLUETOOTH LOGIC ---
-
+        // --- BLE CONNECTION ---
         btnConnect.addEventListener('click', async () => {
-            scanWarning.classList.remove('hidden');
             try {
-                log("Scanning for devices starting with 'Dream'...");
+                log("Suche Geräte mit Namen 'Dream'...", "info");
                 device = await navigator.bluetooth.requestDevice({
                     filters: [
                         { namePrefix: "Dream" },
-                        { name: "DREAMSCREEN" },
-                        { name: "DreamScreen" }
+                        { name: "DREAMSCREEN" }
                     ],
-                    optionalServices: [0xFF60, SERVICE_UUID]
+                    optionalServices: [0xFF60, "0000ff60-0000-1000-8000-00805f9b34fb"]
                 });
 
-                document.getElementById('deviceName').textContent = device.name || "Unnamed Device";
-                device.addEventListener('gattserverdisconnected', onDisconnected);
+                document.getElementById('deviceName').textContent = device.name;
+                device.addEventListener('gattserverdisconnected', () => {
+                    document.getElementById('connectionStatus').textContent = "DISCONNECTED";
+                    btnConnect.classList.remove('hidden');
+                    manualControls.classList.add('opacity-50');
+                    log("Verbindung verloren.", "error");
+                });
 
-                log(`Connecting to GATT Server...`);
-                server = await device.gatt.connect();
-
-                log(`Getting Service 0xFF60...`);
-                // Try short and long UUID
+                log("Verbinde...", "info");
+                const server = await device.gatt.connect();
+                
+                // Try short UUID first, then long
+                let service;
                 try {
                     service = await server.getPrimaryService(0xFF60);
                 } catch(e) {
-                     log("Short UUID failed, trying long...");
-                     service = await server.getPrimaryService(SERVICE_UUID);
+                    service = await server.getPrimaryService("0000ff60-0000-1000-8000-00805f9b34fb");
                 }
 
-                log(`Getting Characteristics...`);
                 charWrite = await service.getCharacteristic(0xFF61);
                 charNotify = await service.getCharacteristic(0xFF62);
-
-                log(`Starting Notifications on 0xFF62...`);
+                
                 await charNotify.startNotifications();
-                charNotify.addEventListener('characteristicvaluechanged', handleNotifications);
+                charNotify.addEventListener('characteristicvaluechanged', (e) => {
+                    const val = toHexString(e.target.value);
+                    log(val, 'rx');
+                    
+                    // IF SCANNING, STOP!
+                    if (isScanning) {
+                        scanStopSignal = true;
+                        alert("ANTWORT ERHALTEN! Scan gestoppt. Siehe Log für Details.");
+                        log("GÜLTIGE KONFIGURATION GEFUNDEN!", "success");
+                    }
+                });
 
-                connectionStatus.textContent = "VERBUNDEN";
-                connectionStatus.className = "text-green-400 font-bold";
+                document.getElementById('connectionStatus').textContent = "CONNECTED";
+                document.getElementById('connectionStatus').className = "text-green-500 font-bold";
                 btnConnect.classList.add('hidden');
-                btnDisconnect.classList.remove('hidden');
-                scanWarning.classList.add('hidden');
+                manualControls.classList.remove('opacity-50');
                 enableControls(true);
-                log("Connected! Try 'Force Ambient Mode' first.", "success");
+                log("Bereit. Starte den Scan!", "success");
 
-            } catch (error) {
-                log(error, 'error');
-                if(error.toString().includes("User cancelled")) {
-                     scanWarning.classList.add('hidden');
-                }
+            } catch (e) {
+                log(e, 'error');
             }
         });
 
-        function onDisconnected() {
-            connectionStatus.textContent = "Getrennt";
-            connectionStatus.className = "text-red-400 font-bold";
-            btnConnect.classList.remove('hidden');
-            btnDisconnect.classList.add('hidden');
-            enableControls(false);
-            log("Device disconnected.", "error");
-        }
-
-        btnDisconnect.addEventListener('click', () => {
-            if (device && device.gatt.connected) {
-                device.gatt.disconnect();
-            }
-        });
-
-        function handleNotifications(event) {
-            const value = event.target.value;
-            log(toHexString(value), 'rx');
-        }
-
-        async function sendPacket(cmd1, cmd2, payloadBytes = []) {
-            if (!device || !device.gatt.connected) {
-                log("Not connected!", "error");
-                return;
+        // --- PACKET BUILDER ---
+        function buildPacket(grp, flag, payloadArray, rawMode = false) {
+            // payloadArray includes Cmd1, Cmd2, Payload...
+            
+            if (rawMode) {
+                return new Uint8Array(payloadArray);
             }
 
-            const flag = parseInt(document.getElementById('flagSelect').value, 16);
-            const grp = parseInt(document.getElementById('groupIdInput').value, 16);
+            // FC [Len] [Grp] [Flag] [Cmd1] [Cmd2] [Payload...] [CRC]
+            // Len = PayloadArray.length(which has cmds) + 1(Grp) + 1(Flag) + 1(CRC) - NO.
+            // C# Logic: payload.Length + 5.
+            // Wait, in C# payload is just DATA. Here payloadArray includes CMD1, CMD2.
+            // So if payloadArray is [01, 0B]. That's 2 bytes.
+            // C# Logic for Ping: Cmd1(1) + Cmd2(1) + Payload(0) = 2 bytes of data.
+            // C# header logic uses payload.Length.
+            // Let's stick to the visual structure:
+            // Byte 0: FC
+            // Byte 1: Length (Total bytes after length byte including CRC)
+            // Byte 2: Grp
+            // Byte 3: Flag
+            // ... Data ...
+            // Last: CRC
             
-            const len = payloadBytes.length + 5; 
-
-            const packet = [0xFC, len, grp, flag, cmd1, cmd2, ...payloadBytes];
+            // Total Data Bytes = PayloadArray.length.
+            // Length Byte Value = DataBytes + 1(Grp) + 1(Flag) + 1(CRC).
+            // Example: Ping [01, 0B]. Data=2. Len = 2+1+1+1 = 5.
+            // Matches log: FC 05 ...
             
+            const len = payloadArray.length + 3; // Grp + Flag + CRC
+            
+            const packet = [0xFC, len, grp, flag, ...payloadArray];
             const crc = calculateCRC8(packet);
             packet.push(crc);
-
-            const data = new Uint8Array(packet);
             
-            log(toHexString(new DataView(data.buffer)), 'tx');
+            return new Uint8Array(packet);
+        }
+
+        async function sendBytes(u8Array) {
+            if (!charWrite) return;
             try {
-                await charWrite.writeValue(data);
+                log(toHexString(new DataView(u8Array.buffer)), 'tx');
+                await charWrite.writeValue(u8Array);
             } catch (e) {
-                log("Write Failed: " + e, 'error');
+                log("Write Err: " + e, 'error');
             }
         }
 
-        // --- BUTTON ACTIONS ---
-
-        function enableControls(enabled) {
-            const btns = document.querySelectorAll('button:not(#btnConnect)');
-            btns.forEach(b => b.disabled = !enabled);
-        }
-        enableControls(false); 
-
-        document.getElementById('btnSendCustom').addEventListener('click', () => {
-            const c1 = parseInt(document.getElementById('cmd1Input').value, 16);
-            const c2 = parseInt(document.getElementById('cmd2Input').value, 16);
+        // --- SCANNER LOGIC ---
+        btnStartScan.addEventListener('click', async () => {
+            if (isScanning) return;
+            isScanning = true;
+            scanStopSignal = false;
+            btnStartScan.textContent = "SCAN LÄUFT... (STOPP BEI RX)";
+            btnStartScan.classList.add('animate-pulse', 'bg-red-700');
             
-            const payloadStr = document.getElementById('payloadInput').value.trim();
-            let payload = [];
-            if (payloadStr) {
-                payload = payloadStr.split(/\s+/).map(h => parseInt(h, 16));
+            const statusDiv = document.getElementById('scanStatus');
+            const lblGrp = document.getElementById('scanGrp');
+            const lblFlag = document.getElementById('scanFlag');
+            statusDiv.classList.remove('hidden');
+
+            // LOOP
+            for (let cmd of SCAN_CMDS) {
+                for (let grp of SCAN_GROUPS) {
+                    for (let flag of SCAN_FLAGS) {
+                        if (scanStopSignal) break;
+
+                        lblGrp.textContent = grp.toString(16).toUpperCase();
+                        lblFlag.textContent = flag.toString(16).toUpperCase();
+                        
+                        // Build packet
+                        const pkt = buildPacket(grp, flag, cmd);
+                        await sendBytes(pkt);
+
+                        // Wait 250ms for reply
+                        await new Promise(r => setTimeout(r, 250));
+                    }
+                    if (scanStopSignal) break;
+                }
+                if (scanStopSignal) break;
             }
-            sendPacket(c1, c2, payload);
+
+            isScanning = false;
+            btnStartScan.textContent = "START BRUTE FORCE SCAN";
+            btnStartScan.classList.remove('animate-pulse', 'bg-red-700');
+            if(!scanStopSignal) log("Scan beendet. Keine Antwort.", "error");
         });
 
-        document.getElementById('btnClearLog').addEventListener('click', () => {
-            consoleLog.innerHTML = '';
+
+        // --- MANUAL SEND ---
+        document.getElementById('btnSendRaw').addEventListener('click', () => {
+            const grp = parseInt(document.getElementById('groupIdInput').value, 16);
+            const flag = parseInt(document.getElementById('flagSelect').value, 16);
+            const rawStr = document.getElementById('rawPayload').value.trim();
+            const bytes = rawStr.split(/\s+/).map(x => parseInt(x, 16));
+            const rawMode = document.getElementById('chkNoHeader').checked;
+
+            const pkt = buildPacket(grp, flag, bytes, rawMode);
+            sendBytes(pkt);
         });
 
-        // MACROS
-        
-        // 1. Discovery
-        document.getElementById('btnMacroDiscovery').addEventListener('click', () => {
-            const oldFlag = document.getElementById('flagSelect').value;
-            const oldGrp = document.getElementById('groupIdInput').value;
-            
-            document.getElementById('flagSelect').value = "0x30";
-            document.getElementById('groupIdInput').value = "FF"; 
-            
-            sendPacket(0x01, 0x0A, []); 
-            
-            setTimeout(() => {
-                document.getElementById('flagSelect').value = oldFlag;
-                document.getElementById('groupIdInput').value = oldGrp;
-            }, 500);
-        });
+        // --- MACROS ---
+        function runMacro(c1, c2, payload) {
+            // Uses current manual settings for Group/Flag
+             const grp = parseInt(document.getElementById('groupIdInput').value, 16);
+             const flag = parseInt(document.getElementById('flagSelect').value, 16);
+             const pkt = buildPacket(grp, flag, [c1, c2, ...payload]);
+             sendBytes(pkt);
+        }
 
-        // 2. Ping
-        document.getElementById('btnMacroPing').addEventListener('click', () => {
-            sendPacket(0x01, 0x0B, []);
-        });
+        document.getElementById('btnReadVersion').addEventListener('click', () => runMacro(0x02, 0x02, []));
+        document.getElementById('btnModeAmbient').addEventListener('click', () => runMacro(0x03, 0x01, [0x03]));
+        document.getElementById('btnColorRed').addEventListener('click', () => runMacro(0x03, 0x05, [0xFF, 0x00, 0x00]));
 
-        // 3. Ambient
-        document.getElementById('btnMacroAmbient').addEventListener('click', () => {
-            sendPacket(0x03, 0x01, [0x03]);
-        });
-
-        // 4. Colors
-        document.getElementById('btnMacroRed').addEventListener('click', () => {
-            sendPacket(0x03, 0x05, [0xFF, 0x00, 0x00]);
-        });
-        document.getElementById('btnMacroGreen').addEventListener('click', () => {
-            sendPacket(0x03, 0x05, [0x00, 0xFF, 0x00]);
-        });
-        document.getElementById('btnMacroBlue').addEventListener('click', () => {
-            sendPacket(0x03, 0x05, [0x00, 0x00, 0xFF]);
-        });
-
-        // DANGER: Bootloader
-        document.getElementById('btnBootloader').addEventListener('click', () => {
-             if(confirm("ACHTUNG: Dies versetzt das Gerät in den Update-Modus. Es reagiert möglicherweise nicht mehr auf Lichtbefehle, bis es neu gestartet wird. Fortfahren?")) {
-                 sendPacket(0x04, 0x01, [0x4B, 0x61]);
-             }
-        });
+        function enableControls(state) {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(b => {
+                if(b.id !== 'btnConnect') b.disabled = !state;
+            });
+        }
+        enableControls(false);
 
     </script>
 </body>
 </html>
 
-
- 
