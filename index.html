@@ -25,7 +25,7 @@
         </div>
         <div class="flex gap-2">
             <button id="btnConnect" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold transition-colors">
-                Verbinden (Alle anzeigen)
+                Verbinden (Suche "Dream...")
             </button>
             <button id="btnDisconnect" class="bg-red-900 hover:bg-red-700 text-gray-300 px-4 py-2 rounded font-bold hidden transition-colors">
                 Trennen
@@ -49,6 +49,9 @@
                     <span class="text-slate-400">Device:</span>
                     <span id="deviceName" class="text-slate-200">-</span>
                 </div>
+                <div class="mt-2 text-xs text-orange-400 hidden" id="scanWarning">
+                    Hinweis: Falls Liste leer, nRF Connect beenden!
+                </div>
             </div>
 
             <!-- Settings -->
@@ -58,10 +61,10 @@
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Write Flag (Byte 3)</label>
                         <select id="flagSelect" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-sm">
-                            <option value="0x01">0x01 (No Response - Silent)</option>
-                            <option value="0x11">0x11 (Response Req - WLAN default)</option>
+                            <option value="0x01">0x01 (Silent / No Resp)</option>
+                            <option value="0x11">0x11 (Response Req)</option>
                             <option value="0x00">0x00 (No Flags)</option>
-                            <option value="0x30">0x30 (Discovery Flag?)</option>
+                            <option value="0x30">0x30 (Discovery)</option>
                         </select>
                     </div>
                     <div>
@@ -143,7 +146,7 @@
                 <button id="btnClearLog" class="text-slate-500 hover:text-white uppercase">Clear</button>
             </div>
             <div id="consoleLog" class="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-2">
-                <div class="text-slate-600 italic">Ready to connect... waiting for device.</div>
+                <div class="text-slate-600 italic">Bereit. Stelle sicher, dass nRF Connect getrennt ist!</div>
             </div>
             <!-- Packet Decoder Preview (Static for now, could be dynamic) -->
             <div class="p-2 bg-slate-900 border-t border-slate-800 text-xs text-slate-500">
@@ -154,7 +157,6 @@
 
     <script>
         // --- CRC TABLE & LOGIC ---
-        // Same table as in the C# code
         const CRC8_TABLE = [
             0x00, 0x07, 0x0E, 0x09, 0x1C, 0x1B, 0x12, 0x15, 0x38, 0x3F, 0x36, 0x31, 0x24, 0x23, 0x2A, 0x2D,
             0x70, 0x77, 0x7E, 0x79, 0x6C, 0x6B, 0x62, 0x65, 0x48, 0x4F, 0x46, 0x41, 0x54, 0x53, 0x5A, 0x5D,
@@ -176,11 +178,7 @@
 
         function calculateCRC8(dataArray) {
             let crc = 0;
-            // The logic from C#: length = (data[1] & 255) + 1
-            // This means CRC covers Header + LengthByte + Group + Flag + Cmds + Payload
-            // Basically everything EXCEPT the CRC byte itself.
             let length = dataArray[1] + 1;
-            
             for (let i = 0; i < length; i++) {
                 if (i >= dataArray.length) break;
                 let byte = dataArray[i];
@@ -193,7 +191,6 @@
         // --- BLUETOOTH VARIABLES ---
         let device, server, service;
         let charWrite, charNotify;
-        // NOTE: We use the Full 128-bit UUID here to be safe, but we scan for EVERYTHING.
         const SERVICE_UUID = "0000ff60-0000-1000-8000-00805f9b34fb";
         const CHAR_WRITE_UUID = 0xFF61; 
         const CHAR_NOTIFY_UUID = 0xFF62;
@@ -203,6 +200,7 @@
         const btnDisconnect = document.getElementById('btnDisconnect');
         const connectionStatus = document.getElementById('connectionStatus');
         const consoleLog = document.getElementById('consoleLog');
+        const scanWarning = document.getElementById('scanWarning');
         
         // --- LOGGING ---
         function log(msg, type = 'info') {
@@ -235,12 +233,16 @@
         // --- BLUETOOTH LOGIC ---
 
         btnConnect.addEventListener('click', async () => {
+            scanWarning.classList.remove('hidden');
             try {
-                // FIXED: Changed to acceptAllDevices because the device might not advertise 0xFF60
-                log("Scanning for ALL devices...");
+                log("Scanning for devices starting with 'Dream'...");
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true, 
-                    optionalServices: [0xFF60, SERVICE_UUID] // Must list services to access them later
+                    filters: [
+                        { namePrefix: "Dream" },
+                        { name: "DREAMSCREEN" },
+                        { name: "DreamScreen" }
+                    ],
+                    optionalServices: [0xFF60, SERVICE_UUID]
                 });
 
                 document.getElementById('deviceName').textContent = device.name || "Unnamed Device";
@@ -250,7 +252,7 @@
                 server = await device.gatt.connect();
 
                 log(`Getting Service 0xFF60...`);
-                // Try getting service by short or long UUID
+                // Try short and long UUID
                 try {
                     service = await server.getPrimaryService(0xFF60);
                 } catch(e) {
@@ -270,11 +272,15 @@
                 connectionStatus.className = "text-green-400 font-bold";
                 btnConnect.classList.add('hidden');
                 btnDisconnect.classList.remove('hidden');
+                scanWarning.classList.add('hidden');
                 enableControls(true);
-                log("Connected! Ready to send commands.", "success");
+                log("Connected! Try 'Force Ambient Mode' first.", "success");
 
             } catch (error) {
                 log(error, 'error');
+                if(error.toString().includes("User cancelled")) {
+                     scanWarning.classList.add('hidden');
+                }
             }
         });
 
@@ -304,9 +310,6 @@
                 return;
             }
 
-            // 1. Build Packet
-            // Structure: FC [Len] [Grp] [Flag] [C1] [C2] [Payload...] [CRC]
-            
             const flag = parseInt(document.getElementById('flagSelect').value, 16);
             const grp = parseInt(document.getElementById('groupIdInput').value, 16);
             
@@ -314,13 +317,11 @@
 
             const packet = [0xFC, len, grp, flag, cmd1, cmd2, ...payloadBytes];
             
-            // 2. Calculate CRC
             const crc = calculateCRC8(packet);
             packet.push(crc);
 
             const data = new Uint8Array(packet);
             
-            // 3. Send
             log(toHexString(new DataView(data.buffer)), 'tx');
             try {
                 await charWrite.writeValue(data);
@@ -335,7 +336,7 @@
             const btns = document.querySelectorAll('button:not(#btnConnect)');
             btns.forEach(b => b.disabled = !enabled);
         }
-        enableControls(false); // Disable initally
+        enableControls(false); 
 
         document.getElementById('btnSendCustom').addEventListener('click', () => {
             const c1 = parseInt(document.getElementById('cmd1Input').value, 16);
@@ -349,9 +350,13 @@
             sendPacket(c1, c2, payload);
         });
 
+        document.getElementById('btnClearLog').addEventListener('click', () => {
+            consoleLog.innerHTML = '';
+        });
+
         // MACROS
         
-        // 1. Discovery: Cmd 01 0A, Flag 30 (Broadcast?), Grp FF
+        // 1. Discovery
         document.getElementById('btnMacroDiscovery').addEventListener('click', () => {
             const oldFlag = document.getElementById('flagSelect').value;
             const oldGrp = document.getElementById('groupIdInput').value;
@@ -367,12 +372,12 @@
             }, 500);
         });
 
-        // 2. Ping: Cmd 01 0B
+        // 2. Ping
         document.getElementById('btnMacroPing').addEventListener('click', () => {
             sendPacket(0x01, 0x0B, []);
         });
 
-        // 3. Ambient: Cmd 03 01 -> Payload 03
+        // 3. Ambient
         document.getElementById('btnMacroAmbient').addEventListener('click', () => {
             sendPacket(0x03, 0x01, [0x03]);
         });
