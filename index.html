@@ -3,396 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DreamScreen BT Brute Force</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>FTS Ghost Hunter</title>
     <style>
-        body { background-color: #0f172a; color: #e2e8f0; font-family: monospace; }
-        .hex-font { font-family: 'Courier New', Courier, monospace; }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        body { font-family: monospace; background: #121212; color: #00ff00; padding: 10px; }
+        h2 { border-bottom: 1px solid #444; }
+        button { width: 100%; padding: 15px; background: #333; color: white; border: 1px solid #00ff00; font-size: 1.2em; margin-bottom: 10px; cursor: pointer; }
+        button.stop { background: #500; border-color: red; }
+        .device { border: 1px solid #333; padding: 10px; margin-bottom: 5px; background: #1a1a1a; }
+        .rssi-bar { height: 5px; background: #444; margin-top: 5px; }
+        .rssi-val { height: 100%; background: #00ff00; transition: width 0.1s; }
+        .log { font-size: 0.8em; color: #888; height: 100px; overflow-y: scroll; border-top: 1px solid #333; margin-top: 20px;}
+        .highlight { color: #ff00ff; font-weight: bold; }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
+<body>
 
-    <!-- Header -->
-    <header class="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center shadow-lg z-10">
-        <div>
-            <h1 class="text-xl font-bold text-red-500">DreamScreen <span class="text-white">///</span> BRUTE FORCE</h1>
-            <p class="text-xs text-slate-500">Protokoll Scanner & Debugger</p>
-        </div>
-        <div class="flex gap-2">
-            <button id="btnConnect" class="bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded font-bold transition-all shadow-lg border border-blue-500">
-                1. VERBINDEN
-            </button>
-            <button id="btnDisconnect" class="bg-slate-700 hover:bg-slate-600 text-gray-300 px-4 py-2 rounded font-bold hidden">
-                TRENNEN
-            </button>
-        </div>
-    </header>
+    <h2>FTS GHOST HUNTER</h2>
+    <div id="status">Bereit. (Flags aktiviert?)</div>
+    
+    <button onclick="startScan()">SCAN STARTEN</button>
+    <button class="stop" onclick="stopScan()">STOPP</button>
 
-    <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
-        
-        <!-- Left Panel: Controls -->
-        <div class="w-full md:w-1/2 p-4 overflow-y-auto border-r border-slate-700 bg-slate-900">
-            
-            <div id="statusPanel" class="mb-4 p-3 bg-slate-800 rounded border border-slate-600">
-                <div class="flex justify-between items-center">
-                    <span class="text-slate-400 text-xs uppercase">Status</span>
-                    <span id="connectionStatus" class="text-red-500 font-bold">DISCONNECTED</span>
-                </div>
-                <div class="flex justify-between items-center mt-1">
-                    <span class="text-slate-400 text-xs uppercase">Device</span>
-                    <span id="deviceName" class="text-slate-200">-</span>
-                </div>
-            </div>
+    <h3>Gefundene Ziele (Filter aktiv)</h3>
+    <div id="results"></div>
 
-            <!-- AUTOMATIC SCANNER -->
-            <div class="mb-6 p-4 bg-slate-800/50 rounded border border-yellow-600/50 shadow-inner relative overflow-hidden">
-                <div class="absolute top-0 right-0 bg-yellow-600 text-black text-xs font-bold px-2 py-1">EMPFEHLUNG</div>
-                <h2 class="text-sm uppercase tracking-wider text-yellow-500 mb-3 font-bold">2. Protokoll Scanner</h2>
-                <p class="text-xs text-slate-400 mb-4">
-                    Sendet systematisch Pings mit verschiedenen Gruppen & Flags, bis das Gerät antwortet.
-                </p>
-                
-                <div id="scanStatus" class="hidden mb-3 text-xs font-mono p-2 bg-black border border-slate-700 text-cyan-400">
-                    Testing: Grp <span id="scanGrp">-</span> | Flag <span id="scanFlag">-</span>
-                </div>
-
-                <button id="btnStartScan" class="w-full bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-3 rounded shadow transition-all border border-yellow-500 disabled:opacity-50">
-                    START BRUTE FORCE SCAN
-                </button>
-            </div>
-
-            <!-- MANUAL CONTROLS -->
-            <div class="mb-6 opacity-50 transition-opacity" id="manualControls">
-                <h2 class="text-sm uppercase tracking-wider text-slate-500 mb-2 font-bold">Manuelle Kontrolle</h2>
-                
-                <div class="grid grid-cols-2 gap-2 mb-4">
-                    <div>
-                        <label class="block text-[10px] text-slate-400 uppercase mb-1">Flag (Byte 3)</label>
-                        <select id="flagSelect" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-sm text-white">
-                            <option value="0x01">0x01 (Silent)</option>
-                            <option value="0x11">0x11 (Response)</option>
-                            <option value="0x00">0x00 (Null)</option>
-                            <option value="0x30">0x30 (Disc)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] text-slate-400 uppercase mb-1">Group (Byte 2)</label>
-                        <input type="text" id="groupIdInput" value="00" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-sm hex-font text-white text-center" maxlength="2">
-                    </div>
-                </div>
-
-                <div class="flex gap-2 mb-2">
-                    <input type="text" id="rawPayload" value="03 05 FF 00 00" class="flex-1 bg-black border border-slate-600 rounded p-2 font-mono text-sm text-white uppercase" placeholder="CMD1 CMD2 PAYLOAD">
-                    <button id="btnSendRaw" class="bg-slate-700 hover:bg-slate-600 text-white px-4 rounded font-bold text-xs uppercase border border-slate-500">
-                        Senden
-                    </button>
-                </div>
-                
-                <div class="flex items-center gap-2 mb-4">
-                    <input type="checkbox" id="chkNoHeader" class="w-4 h-4 bg-slate-800 border-slate-600 rounded">
-                    <label for="chkNoHeader" class="text-xs text-red-400">Raw Mode (Ohne FC/CRC Header)</label>
-                </div>
-
-                <h3 class="text-xs font-bold text-slate-500 mb-2 mt-4 uppercase">Test Macros</h3>
-                <div class="grid grid-cols-1 gap-2">
-                     <button id="btnReadVersion" class="bg-blue-900/40 hover:bg-blue-800 border border-blue-800 text-blue-200 py-2 px-3 rounded text-left text-sm font-mono">
-                        READ VERSION (02 02)
-                    </button>
-                    <button id="btnModeAmbient" class="bg-slate-700 hover:bg-slate-600 text-white py-2 px-3 rounded text-left text-sm font-mono">
-                        SET MODE: AMBIENT (03 01 -> 03)
-                    </button>
-                    <button id="btnColorRed" class="bg-red-900/40 hover:bg-red-800 border border-red-800 text-red-200 py-2 px-3 rounded text-left text-sm font-mono">
-                        SET COLOR: RED (03 05 -> FF0000)
-                    </button>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- Right Panel: Logs -->
-        <div class="w-full md:w-1/2 bg-black flex flex-col border-l border-slate-700">
-            <div class="bg-slate-800 p-2 text-[10px] text-slate-400 flex justify-between items-center border-b border-slate-700">
-                <span>SERIAL MONITOR (0xFF62 NOTIFY ACTIVE)</span>
-                <button id="btnClearLog" class="hover:text-white">CLEAR</button>
-            </div>
-            <div id="consoleLog" class="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1">
-                <div class="text-slate-600">> Warten auf Verbindung...</div>
-            </div>
-        </div>
-    </main>
+    <div class="log" id="consoleLog"></div>
 
     <script>
-        // --- CORE LOGIC ---
-        const CRC8_TABLE = [
-            0x00, 0x07, 0x0E, 0x09, 0x1C, 0x1B, 0x12, 0x15, 0x38, 0x3F, 0x36, 0x31, 0x24, 0x23, 0x2A, 0x2D,
-            0x70, 0x77, 0x7E, 0x79, 0x6C, 0x6B, 0x62, 0x65, 0x48, 0x4F, 0x46, 0x41, 0x54, 0x53, 0x5A, 0x5D,
-            0xE0, 0xE7, 0xEE, 0xE9, 0xFC, 0xFB, 0xF2, 0xF5, 0xD8, 0xDF, 0xD6, 0xD1, 0xC4, 0xC3, 0xCA, 0xCD,
-            0x90, 0x97, 0x9E, 0x99, 0x8C, 0x8B, 0x82, 0x85, 0xA8, 0xAF, 0xA6, 0xA1, 0xB4, 0xB3, 0xBA, 0xBD,
-            0xC7, 0xC0, 0xC9, 0xCE, 0xDB, 0xDC, 0xD5, 0xD2, 0xFF, 0xF8, 0xF1, 0xF6, 0xE3, 0xE4, 0xED, 0xEA,
-            0xB7, 0xB0, 0xB9, 0xBE, 0xAB, 0xAC, 0xA5, 0xA2, 0x8F, 0x88, 0x81, 0x86, 0x93, 0x94, 0x9D, 0x9A,
-            0x27, 0x20, 0x29, 0x2E, 0x3B, 0x3C, 0x35, 0x32, 0x1F, 0x18, 0x11, 0x16, 0x03, 0x04, 0x0D, 0x0A,
-            0x57, 0x50, 0x59, 0x5E, 0x4B, 0x4C, 0x45, 0x42, 0x6F, 0x68, 0x61, 0x66, 0x73, 0x74, 0x7D, 0x7A,
-            0x89, 0x8E, 0x87, 0x80, 0x95, 0x92, 0x9B, 0x9C, 0xB1, 0xB6, 0xBF, 0xB8, 0xAD, 0xAA, 0xA3, 0xA4,
-            0xF9, 0xFE, 0xF7, 0xF0, 0xE5, 0xE2, 0xEB, 0xEC, 0xC1, 0xC6, 0xCF, 0xC8, 0xDD, 0xDA, 0xD3, 0xD4,
-            0x69, 0x6E, 0x67, 0x60, 0x75, 0x72, 0x7B, 0x7C, 0x51, 0x56, 0x5F, 0x58, 0x4D, 0x4A, 0x43, 0x44,
-            0x19, 0x1E, 0x17, 0x10, 0x05, 0x02, 0x0B, 0x0C, 0x21, 0x26, 0x2F, 0x28, 0x3D, 0x3A, 0x33, 0x34,
-            0x4E, 0x49, 0x40, 0x47, 0x52, 0x55, 0x5C, 0x5B, 0x76, 0x71, 0x78, 0x7F, 0x6A, 0x6D, 0x64, 0x63,
-            0x3E, 0x39, 0x30, 0x37, 0x22, 0x25, 0x2C, 0x2B, 0x06, 0x01, 0x08, 0x0F, 0x1A, 0x1D, 0x14, 0x13,
-            0xAE, 0xA9, 0xA0, 0xA7, 0xB2, 0xB5, 0xBC, 0xBB, 0x96, 0x91, 0x98, 0x9F, 0x8A, 0x8D, 0x84, 0x83,
-            0xDE, 0xD9, 0xD0, 0xD7, 0xC2, 0xC5, 0xCC, 0xCB, 0xE6, 0xE1, 0xE8, 0xEF, 0xFA, 0xFD, 0xF4, 0xF3
-        ];
+        let scanResult;
+        const TARGET_COMPANY_ID = 0x0059; // Nordic Semiconductor
+        const TARGET_SERVICE_UUID = "00001523-1212-efde-1523-785feabcd123"; // Aus deiner CBOR Analyse
+        const SHORT_UUID = "1523";
 
-        function calculateCRC8(dataArray) {
-            let crc = 0;
-            // Logic: length = (data[1] & 255) + 1. 
-            // Data[1] is PayloadLen+5. So Length covers Header(1)+Len(1)+Grp(1)+Flag(1)+C1(1)+C2(1)+Payload(N).
-            let length = dataArray[1] + 1;
-            for (let i = 0; i < length; i++) {
-                if (i >= dataArray.length) break;
-                let byte = dataArray[i];
-                let idx = (byte ^ crc) & 0xFF;
-                crc = CRC8_TABLE[idx];
-            }
-            return crc;
+        // Speicher für Geräte, gruppiert nach Payload (nicht MAC!)
+        const ghosts = {};
+
+        function log(msg) {
+            const el = document.getElementById('consoleLog');
+            el.innerHTML = `> ${msg}<br>` + el.innerHTML;
         }
 
-        // --- BLE GLOBALS ---
-        let device, charWrite, charNotify;
-        let isScanning = false;
-        let scanStopSignal = false;
-        
-        // --- SCAN CONFIGURATIONS ---
-        // Groups to test
-        const SCAN_GROUPS = [0x00, 0x01, 0x02, 0xFF];
-        // Flags to test
-        const SCAN_FLAGS = [0x00, 0x01, 0x11, 0x21, 0x30]; 
-        // Commands to test: [Cmd1, Cmd2, Payload...]
-        // 01 0B (Ping), 02 02 (Read Version), 01 0A (Discovery)
-        const SCAN_CMDS = [
-            [0x01, 0x0B],      // Ping
-            [0x02, 0x02],      // Read Version
-            [0x01, 0x0A]       // Discovery
-        ];
-
-        // --- UI BINDINGS ---
-        const btnConnect = document.getElementById('btnConnect');
-        const btnStartScan = document.getElementById('btnStartScan');
-        const consoleLog = document.getElementById('consoleLog');
-        const manualControls = document.getElementById('manualControls');
-
-        function log(msg, type = 'info') {
-            const el = document.createElement('div');
-            const time = new Date().toLocaleTimeString().split(' ')[0];
-            el.className = 'font-mono break-all';
-            
-            if (type === 'tx') {
-                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-cyan-500">TX></span> <span class="text-cyan-200">${msg}</span>`;
-            } else if (type === 'rx') {
-                 el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-green-500 font-bold bg-green-900/30 px-1">RX&lt; ${msg}</span>`;
-            } else if (type === 'success') {
-                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-green-400 font-bold">!!! ${msg}</span>`;
-            } else if (type === 'error') {
-                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-red-500">ERR: ${msg}</span>`;
-            } else {
-                el.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-slate-400">${msg}</span>`;
+        async function startScan() {
+            if (!navigator.bluetooth) {
+                alert("Web Bluetooth nicht verfügbar! Nutze Chrome auf Android & HTTPS.");
+                return;
             }
-            consoleLog.appendChild(el);
-            consoleLog.scrollTop = consoleLog.scrollHeight;
-        }
 
-        function toHexString(dataView) {
-            let s = '';
-            for (let i = 0; i < dataView.byteLength; i++) {
-                s += ('0' + dataView.getUint8(i).toString(16).toUpperCase()).slice(-2) + ' ';
-            }
-            return s.trim();
-        }
-
-        // --- BLE CONNECTION ---
-        btnConnect.addEventListener('click', async () => {
             try {
-                log("Suche Geräte mit Namen 'Dream'...", "info");
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        { namePrefix: "Dream" },
-                        { name: "DREAMSCREEN" }
-                    ],
-                    optionalServices: [0xFF60, "0000ff60-0000-1000-8000-00805f9b34fb"]
-                });
-
-                document.getElementById('deviceName').textContent = device.name;
-                device.addEventListener('gattserverdisconnected', () => {
-                    document.getElementById('connectionStatus').textContent = "DISCONNECTED";
-                    btnConnect.classList.remove('hidden');
-                    manualControls.classList.add('opacity-50');
-                    log("Verbindung verloren.", "error");
-                });
-
-                log("Verbinde...", "info");
-                const server = await device.gatt.connect();
+                log("Fordere Scan an...");
                 
-                // Try short UUID first, then long
-                let service;
-                try {
-                    service = await server.getPrimaryService(0xFF60);
-                } catch(e) {
-                    service = await server.getPrimaryService("0000ff60-0000-1000-8000-00805f9b34fb");
-                }
-
-                charWrite = await service.getCharacteristic(0xFF61);
-                charNotify = await service.getCharacteristic(0xFF62);
-                
-                await charNotify.startNotifications();
-                charNotify.addEventListener('characteristicvaluechanged', (e) => {
-                    const val = toHexString(e.target.value);
-                    log(val, 'rx');
-                    
-                    // IF SCANNING, STOP!
-                    if (isScanning) {
-                        scanStopSignal = true;
-                        alert("ANTWORT ERHALTEN! Scan gestoppt. Siehe Log für Details.");
-                        log("GÜLTIGE KONFIGURATION GEFUNDEN!", "success");
-                    }
+                // Wir nutzen acceptAllAdvertisements, um ALLES zu sehen und filtern manuell.
+                // Das umgeht Bugs in den nativen Filtern.
+                scanResult = await navigator.bluetooth.requestLEScan({
+                    acceptAllAdvertisements: true, 
+                    keepRepeatedDevices: true // WICHTIG für RSSI Updates!
                 });
 
-                document.getElementById('connectionStatus').textContent = "CONNECTED";
-                document.getElementById('connectionStatus').className = "text-green-500 font-bold";
-                btnConnect.classList.add('hidden');
-                manualControls.classList.remove('opacity-50');
-                enableControls(true);
-                log("Bereit. Starte den Scan!", "success");
+                log("Scan läuft! Warte auf Pakete...");
+                document.getElementById('status').innerText = "SCAN LÄUFT... BEWEG DICH!";
 
-            } catch (e) {
-                log(e, 'error');
-            }
-        });
+                navigator.bluetooth.addEventListener('advertisementreceived', event => {
+                    handlePacket(event);
+                });
 
-        // --- PACKET BUILDER ---
-        function buildPacket(grp, flag, payloadArray, rawMode = false) {
-            // payloadArray includes Cmd1, Cmd2, Payload...
-            
-            if (rawMode) {
-                return new Uint8Array(payloadArray);
-            }
-
-            // FC [Len] [Grp] [Flag] [Cmd1] [Cmd2] [Payload...] [CRC]
-            // Len = PayloadArray.length(which has cmds) + 1(Grp) + 1(Flag) + 1(CRC) - NO.
-            // C# Logic: payload.Length + 5.
-            // Wait, in C# payload is just DATA. Here payloadArray includes CMD1, CMD2.
-            // So if payloadArray is [01, 0B]. That's 2 bytes.
-            // C# Logic for Ping: Cmd1(1) + Cmd2(1) + Payload(0) = 2 bytes of data.
-            // C# header logic uses payload.Length.
-            // Let's stick to the visual structure:
-            // Byte 0: FC
-            // Byte 1: Length (Total bytes after length byte including CRC)
-            // Byte 2: Grp
-            // Byte 3: Flag
-            // ... Data ...
-            // Last: CRC
-            
-            // Total Data Bytes = PayloadArray.length.
-            // Length Byte Value = DataBytes + 1(Grp) + 1(Flag) + 1(CRC).
-            // Example: Ping [01, 0B]. Data=2. Len = 2+1+1+1 = 5.
-            // Matches log: FC 05 ...
-            
-            const len = payloadArray.length + 3; // Grp + Flag + CRC
-            
-            const packet = [0xFC, len, grp, flag, ...payloadArray];
-            const crc = calculateCRC8(packet);
-            packet.push(crc);
-            
-            return new Uint8Array(packet);
-        }
-
-        async function sendBytes(u8Array) {
-            if (!charWrite) return;
-            try {
-                log(toHexString(new DataView(u8Array.buffer)), 'tx');
-                await charWrite.writeValue(u8Array);
-            } catch (e) {
-                log("Write Err: " + e, 'error');
+            } catch (error) {
+                log("FEHLER: " + error);
+                alert("Scan fehlgeschlagen. Hast du 'Experimental Web Platform Features' in chrome://flags aktiviert?");
             }
         }
 
-        // --- SCANNER LOGIC ---
-        btnStartScan.addEventListener('click', async () => {
-            if (isScanning) return;
-            isScanning = true;
-            scanStopSignal = false;
-            btnStartScan.textContent = "SCAN LÄUFT... (STOPP BEI RX)";
-            btnStartScan.classList.add('animate-pulse', 'bg-red-700');
-            
-            const statusDiv = document.getElementById('scanStatus');
-            const lblGrp = document.getElementById('scanGrp');
-            const lblFlag = document.getElementById('scanFlag');
-            statusDiv.classList.remove('hidden');
+        function stopScan() {
+            if (scanResult) {
+                scanResult.stop();
+                log("Scan gestoppt.");
+                document.getElementById('status').innerText = "Gestoppt.";
+            }
+        }
 
-            // LOOP
-            for (let cmd of SCAN_CMDS) {
-                for (let grp of SCAN_GROUPS) {
-                    for (let flag of SCAN_FLAGS) {
-                        if (scanStopSignal) break;
+        function handlePacket(event) {
+            // 1. Daten extrahieren
+            const mac = event.device.id; // Vorsicht: Im Web ist das oft eine randomisierte ID vom Browser, nicht die echte MAC!
+            const rssi = event.rssi;
+            const manufacturerData = event.manufacturerData;
+            const serviceUuids = event.uuids;
 
-                        lblGrp.textContent = grp.toString(16).toUpperCase();
-                        lblFlag.textContent = flag.toString(16).toUpperCase();
-                        
-                        // Build packet
-                        const pkt = buildPacket(grp, flag, cmd);
-                        await sendBytes(pkt);
+            // 2. FILTERN (Hier passiert die Magie)
+            let isTarget = false;
+            let payloadHex = "";
 
-                        // Wait 250ms for reply
-                        await new Promise(r => setTimeout(r, 250));
+            // Check A: Manufacturer ID
+            manufacturerData.forEach((value, key) => {
+                if (key === TARGET_COMPANY_ID) {
+                    isTarget = true;
+                    // Bytes zu Hex konvertieren für Fingerprint
+                    for (let i = 0; i < value.byteLength; i++) {
+                        payloadHex += value.getUint8(i).toString(16).padStart(2, '0');
                     }
-                    if (scanStopSignal) break;
                 }
-                if (scanStopSignal) break;
-            }
-
-            isScanning = false;
-            btnStartScan.textContent = "START BRUTE FORCE SCAN";
-            btnStartScan.classList.remove('animate-pulse', 'bg-red-700');
-            if(!scanStopSignal) log("Scan beendet. Keine Antwort.", "error");
-        });
-
-
-        // --- MANUAL SEND ---
-        document.getElementById('btnSendRaw').addEventListener('click', () => {
-            const grp = parseInt(document.getElementById('groupIdInput').value, 16);
-            const flag = parseInt(document.getElementById('flagSelect').value, 16);
-            const rawStr = document.getElementById('rawPayload').value.trim();
-            const bytes = rawStr.split(/\s+/).map(x => parseInt(x, 16));
-            const rawMode = document.getElementById('chkNoHeader').checked;
-
-            const pkt = buildPacket(grp, flag, bytes, rawMode);
-            sendBytes(pkt);
-        });
-
-        // --- MACROS ---
-        function runMacro(c1, c2, payload) {
-            // Uses current manual settings for Group/Flag
-             const grp = parseInt(document.getElementById('groupIdInput').value, 16);
-             const flag = parseInt(document.getElementById('flagSelect').value, 16);
-             const pkt = buildPacket(grp, flag, [c1, c2, ...payload]);
-             sendBytes(pkt);
-        }
-
-        document.getElementById('btnReadVersion').addEventListener('click', () => runMacro(0x02, 0x02, []));
-        document.getElementById('btnModeAmbient').addEventListener('click', () => runMacro(0x03, 0x01, [0x03]));
-        document.getElementById('btnColorRed').addEventListener('click', () => runMacro(0x03, 0x05, [0xFF, 0x00, 0x00]));
-
-        function enableControls(state) {
-            const buttons = document.querySelectorAll('button');
-            buttons.forEach(b => {
-                if(b.id !== 'btnConnect') b.disabled = !state;
             });
-        }
-        enableControls(false);
 
+            // Check B: Service UUID (Der 1523er)
+            if (serviceUuids.some(uuid => uuid.includes(SHORT_UUID))) {
+                isTarget = true;
+            }
+
+            // Wenn es kein Ziel ist, ignorieren wir es sofort
+            if (!isTarget) return;
+
+            // 3. Gruppierung / Update
+            // Da MAC rotiert, nutzen wir den Payload oder einfach "TARGET" als Key, 
+            // wenn wir nur das nächste FTS suchen.
+            // Hier gruppieren wir nach dem erkannten Hex-Payload (der statisch sein sollte)
+            const ghostID = payloadHex || "UNKNOWN_PAYLOAD_TARGET"; 
+
+            if (!ghosts[ghostID]) {
+                ghosts[ghostID] = { rssi: -100, count: 0, lastSeen: Date.now() };
+                createDeviceUI(ghostID, payloadHex);
+            }
+
+            ghosts[ghostID].rssi = rssi;
+            ghosts[ghostID].count++;
+            ghosts[ghostID].lastSeen = Date.now();
+
+            updateDeviceUI(ghostID, rssi, payloadHex, mac);
+        }
+
+        function createDeviceUI(id, payload) {
+            const div = document.createElement('div');
+            div.className = 'device';
+            div.id = 'ui-' + id;
+            div.innerHTML = `
+                <div><strong>FTS SIGNAL ERKANNT</strong></div>
+                <div style="font-size:0.8em; color:#aaa">Payload Fingerprint: ${payload.substring(0, 20)}...</div>
+                <div class="mac-display">Letzte MAC: ...</div>
+                <div class="rssi-text">RSSI: -- dBm</div>
+                <div class="rssi-bar"><div class="rssi-val" style="width: 0%"></div></div>
+            `;
+            document.getElementById('results').prepend(div);
+        }
+
+        function updateDeviceUI(id, rssi, payload, mac) {
+            const el = document.getElementById('ui-' + id);
+            if (el) {
+                // RSSI Visualisierung (Skala -100 bis -30)
+                let percent = Math.max(0, Math.min(100, (rssi + 100) * 1.4));
+                
+                el.querySelector('.rssi-val').style.width = percent + '%';
+                el.querySelector('.rssi-text').innerText = `RSSI: ${rssi} dBm (Pakete: ${ghosts[id].count})`;
+                el.querySelector('.mac-display').innerText = `MAC (Browser ID): ${mac}`; // Achtung: Browser obfuscated MACs!
+                
+                // Visuelles Feedback bei sehr nahem Signal
+                if (rssi > -60) {
+                    el.style.borderColor = "#ff00ff"; // Pink bei Nähe
+                    el.style.backgroundColor = "#2a002a";
+                } else {
+                    el.style.borderColor = "#333";
+                    el.style.backgroundColor = "#1a1a1a";
+                }
+            }
+        }
     </script>
 </body>
 </html>
-
+ 
