@@ -2,164 +2,109 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FTS Ghost Hunter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>BLE RAW MONITOR</title>
     <style>
-        body { font-family: monospace; background: #121212; color: #00ff00; padding: 10px; }
-        h2 { border-bottom: 1px solid #444; }
-        button { width: 100%; padding: 15px; background: #333; color: white; border: 1px solid #00ff00; font-size: 1.2em; margin-bottom: 10px; cursor: pointer; }
-        button.stop { background: #500; border-color: red; }
-        .device { border: 1px solid #333; padding: 10px; margin-bottom: 5px; background: #1a1a1a; }
-        .rssi-bar { height: 5px; background: #444; margin-top: 5px; }
-        .rssi-val { height: 100%; background: #00ff00; transition: width 0.1s; }
-        .log { font-size: 0.8em; color: #888; height: 100px; overflow-y: scroll; border-top: 1px solid #333; margin-top: 20px;}
-        .highlight { color: #ff00ff; font-weight: bold; }
+        body { font-family: 'Courier New', monospace; background: #000; color: #0f0; margin: 0; padding: 10px; }
+        button { width: 48%; padding: 15px; font-weight:bold; font-size: 1rem; border: 1px solid #0f0; background: #000; color: #0f0; margin-bottom: 10px; }
+        button.stop { border-color: #f00; color: #f00; }
+        #log { margin-top: 10px; font-size: 0.75rem; word-break: break-all; }
+        .entry { border-bottom: 1px solid #333; padding: 5px 0; }
+        .entry.strong { color: #fff; background: #222; } /* Starkes Signal */
+        .raw { color: #aaa; }
+        .uuid { color: #ff00ff; }
+        .info { color: #0ff; }
     </style>
 </head>
 <body>
 
-    <h2>FTS GHOST HUNTER</h2>
-    <div id="status">Bereit. (Flags aktiviert?)</div>
+    <div style="display:flex; justify-content:space-between;">
+        <button onclick="startScan()">SCAN START</button>
+        <button class="stop" onclick="stopScan()">STOP / FREEZE</button>
+    </div>
     
-    <button onclick="startScan()">SCAN STARTEN</button>
-    <button class="stop" onclick="stopScan()">STOPP</button>
-
-    <h3>Gefundene Ziele (Filter aktiv)</h3>
-    <div id="results"></div>
-
-    <div class="log" id="consoleLog"></div>
+    <div id="status">Warte auf Start...</div>
+    <div id="log"></div>
 
     <script>
         let scanResult;
-        const TARGET_COMPANY_ID = 0x0059; // Nordic Semiconductor
-        const TARGET_SERVICE_UUID = "00001523-1212-efde-1523-785feabcd123"; // Aus deiner CBOR Analyse
-        const SHORT_UUID = "1523";
+        let isScanning = false;
 
-        // Speicher für Geräte, gruppiert nach Payload (nicht MAC!)
-        const ghosts = {};
+        function logToScreen(mac, rssi, name, uuids, manDataHex) {
+            const logDiv = document.getElementById('log');
+            
+            // Highlight starke Signale (>-60dBm) -> Das sind die Geräte direkt neben dir!
+            const isStrong = rssi > -60;
+            const styleClass = isStrong ? 'entry strong' : 'entry';
 
-        function log(msg) {
-            const el = document.getElementById('consoleLog');
-            el.innerHTML = `> ${msg}<br>` + el.innerHTML;
+            const html = `
+                <div class="${styleClass}">
+                    <span class="info">RSSI: ${rssi}</span> | ID: ${mac} <br>
+                    Name: ${name || "N/A"} <br>
+                    <span class="uuid">UUIDs: ${uuids}</span> <br>
+                    <span class="raw">Hex: ${manDataHex}</span>
+                </div>
+            `;
+            
+            // Einfügen am Anfang
+            logDiv.insertAdjacentHTML('afterbegin', html);
+
+            // Liste sauber halten (Max 50 Einträge, sonst crasht der Browser bei Flood)
+            if (logDiv.children.length > 50) {
+                logDiv.lastElementChild.remove();
+            }
         }
 
         async function startScan() {
-            if (!navigator.bluetooth) {
-                alert("Web Bluetooth nicht verfügbar! Nutze Chrome auf Android & HTTPS.");
-                return;
-            }
-
+            if (isScanning) return;
+            document.getElementById('log').innerHTML = ""; // Clear
+            
             try {
-                log("Fordere Scan an...");
-                
-                // Wir nutzen acceptAllAdvertisements, um ALLES zu sehen und filtern manuell.
-                // Das umgeht Bugs in den nativen Filtern.
+                // ALLES zulassen. Keine Filter.
                 scanResult = await navigator.bluetooth.requestLEScan({
-                    acceptAllAdvertisements: true, 
-                    keepRepeatedDevices: true // WICHTIG für RSSI Updates!
+                    acceptAllAdvertisements: true,
+                    keepRepeatedDevices: true
                 });
 
-                log("Scan läuft! Warte auf Pakete...");
-                document.getElementById('status').innerText = "SCAN LÄUFT... BEWEG DICH!";
+                isScanning = true;
+                document.getElementById('status').innerText = "SCAN LÄUFT - RAW MODE";
 
                 navigator.bluetooth.addEventListener('advertisementreceived', event => {
-                    handlePacket(event);
+                    // Daten aufbereiten
+                    const mac = event.device.id; // Browser ID
+                    const rssi = event.rssi;
+                    const name = event.device.name;
+                    
+                    // UUIDs sammeln
+                    let uuids = [];
+                    if (event.uuids) uuids = event.uuids.map(u => u.split('-')[0]); // Nur der Anfang der UUID
+
+                    // Manufacturer Data zu Hex String konvertieren
+                    let hexStr = "";
+                    event.manufacturerData.forEach((value, key) => {
+                        // Key ist die Company ID (z.B. 89 für 0x0059)
+                        let companyIdHex = key.toString(16).padStart(4, '0'); 
+                        hexStr += `[CID:${companyIdHex}] `; // Zeige Company ID explizit an
+                        
+                        for (let i = 0; i < value.byteLength; i++) {
+                            hexStr += value.getUint8(i).toString(16).padStart(2, '0');
+                        }
+                        hexStr += " ";
+                    });
+
+                    logToScreen(mac, rssi, name, uuids.join(', '), hexStr);
                 });
 
             } catch (error) {
-                log("FEHLER: " + error);
-                alert("Scan fehlgeschlagen. Hast du 'Experimental Web Platform Features' in chrome://flags aktiviert?");
+                alert("Fehler: " + error);
             }
         }
 
         function stopScan() {
             if (scanResult) {
                 scanResult.stop();
-                log("Scan gestoppt.");
-                document.getElementById('status').innerText = "Gestoppt.";
-            }
-        }
-
-        function handlePacket(event) {
-            // 1. Daten extrahieren
-            const mac = event.device.id; // Vorsicht: Im Web ist das oft eine randomisierte ID vom Browser, nicht die echte MAC!
-            const rssi = event.rssi;
-            const manufacturerData = event.manufacturerData;
-            const serviceUuids = event.uuids;
-
-            // 2. FILTERN (Hier passiert die Magie)
-            let isTarget = false;
-            let payloadHex = "";
-
-            // Check A: Manufacturer ID
-            manufacturerData.forEach((value, key) => {
-                if (key === TARGET_COMPANY_ID) {
-                    isTarget = true;
-                    // Bytes zu Hex konvertieren für Fingerprint
-                    for (let i = 0; i < value.byteLength; i++) {
-                        payloadHex += value.getUint8(i).toString(16).padStart(2, '0');
-                    }
-                }
-            });
-
-            // Check B: Service UUID (Der 1523er)
-            if (serviceUuids.some(uuid => uuid.includes(SHORT_UUID))) {
-                isTarget = true;
-            }
-
-            // Wenn es kein Ziel ist, ignorieren wir es sofort
-            if (!isTarget) return;
-
-            // 3. Gruppierung / Update
-            // Da MAC rotiert, nutzen wir den Payload oder einfach "TARGET" als Key, 
-            // wenn wir nur das nächste FTS suchen.
-            // Hier gruppieren wir nach dem erkannten Hex-Payload (der statisch sein sollte)
-            const ghostID = payloadHex || "UNKNOWN_PAYLOAD_TARGET"; 
-
-            if (!ghosts[ghostID]) {
-                ghosts[ghostID] = { rssi: -100, count: 0, lastSeen: Date.now() };
-                createDeviceUI(ghostID, payloadHex);
-            }
-
-            ghosts[ghostID].rssi = rssi;
-            ghosts[ghostID].count++;
-            ghosts[ghostID].lastSeen = Date.now();
-
-            updateDeviceUI(ghostID, rssi, payloadHex, mac);
-        }
-
-        function createDeviceUI(id, payload) {
-            const div = document.createElement('div');
-            div.className = 'device';
-            div.id = 'ui-' + id;
-            div.innerHTML = `
-                <div><strong>FTS SIGNAL ERKANNT</strong></div>
-                <div style="font-size:0.8em; color:#aaa">Payload Fingerprint: ${payload.substring(0, 20)}...</div>
-                <div class="mac-display">Letzte MAC: ...</div>
-                <div class="rssi-text">RSSI: -- dBm</div>
-                <div class="rssi-bar"><div class="rssi-val" style="width: 0%"></div></div>
-            `;
-            document.getElementById('results').prepend(div);
-        }
-
-        function updateDeviceUI(id, rssi, payload, mac) {
-            const el = document.getElementById('ui-' + id);
-            if (el) {
-                // RSSI Visualisierung (Skala -100 bis -30)
-                let percent = Math.max(0, Math.min(100, (rssi + 100) * 1.4));
-                
-                el.querySelector('.rssi-val').style.width = percent + '%';
-                el.querySelector('.rssi-text').innerText = `RSSI: ${rssi} dBm (Pakete: ${ghosts[id].count})`;
-                el.querySelector('.mac-display').innerText = `MAC (Browser ID): ${mac}`; // Achtung: Browser obfuscated MACs!
-                
-                // Visuelles Feedback bei sehr nahem Signal
-                if (rssi > -60) {
-                    el.style.borderColor = "#ff00ff"; // Pink bei Nähe
-                    el.style.backgroundColor = "#2a002a";
-                } else {
-                    el.style.borderColor = "#333";
-                    el.style.backgroundColor = "#1a1a1a";
-                }
+                isScanning = false;
+                document.getElementById('status').innerText = "GESTOPPT (Liste eingefroren)";
             }
         }
     </script>
