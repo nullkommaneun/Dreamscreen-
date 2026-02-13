@@ -3,111 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>BLE RAW MONITOR</title>
+    <title>BLE DEEP MINER</title>
     <style>
-        body { font-family: 'Courier New', monospace; background: #000; color: #0f0; margin: 0; padding: 10px; }
-        button { width: 48%; padding: 15px; font-weight:bold; font-size: 1rem; border: 1px solid #0f0; background: #000; color: #0f0; margin-bottom: 10px; }
+        body { font-family: monospace; background: #000; color: #0f0; padding: 10px; }
+        button { width: 48%; padding: 15px; font-weight:bold; font-size: 1rem; background: #222; color: #fff; border: 1px solid #555; }
+        button.active { background: #0f0; color: #000; }
         button.stop { border-color: #f00; color: #f00; }
-        #log { margin-top: 10px; font-size: 0.75rem; word-break: break-all; }
-        .entry { border-bottom: 1px solid #333; padding: 5px 0; }
-        .entry.strong { color: #fff; background: #222; } /* Starkes Signal */
-        .raw { color: #aaa; }
-        .uuid { color: #ff00ff; }
-        .info { color: #0ff; }
+        textarea { width: 100%; height: 300px; background: #111; color: #ccc; border: 1px solid #333; margin-top: 10px; font-size: 10px; }
+        .stats { font-size: 12px; color: #888; margin: 5px 0; }
     </style>
 </head>
 <body>
 
     <div style="display:flex; justify-content:space-between;">
-        <button onclick="startScan()">SCAN START</button>
-        <button class="stop" onclick="stopScan()">STOP / FREEZE</button>
+        <button id="btnStart" onclick="startScan()">START SCAN</button>
+        <button class="stop" onclick="stopScan()">STOP</button>
     </div>
+
+    <div class="stats" id="status">Bereit.</div>
     
-    <div id="status">Warte auf Start...</div>
-    <div id="log"></div>
+    <textarea id="logArea" readonly placeholder="Daten erscheinen hier..."></textarea>
+    
+    <button onclick="copyLog()" style="width:100%; margin-top:5px;">ALLES KOPIEREN</button>
+    <button onclick="clearLog()" style="width:100%; margin-top:5px; background:#400;">LÖSCHEN</button>
 
     <script>
         let scanResult;
-        let isScanning = false;
+        
+        // Filter-Listen (ignoriere Consumer-Schrott)
+        const IGNORE_CIDS = ["004c", "0075", "0006", "0003"]; // Apple, Samsung, Microsoft, Logitech
+        const IGNORE_NAMES = ["MEGABOOM", "Headset", "Phone", "TV"];
 
-        function logToScreen(mac, rssi, name, uuids, manDataHex) {
-            const logDiv = document.getElementById('log');
-            
-            // Highlight starke Signale (>-60dBm) -> Das sind die Geräte direkt neben dir!
-            const isStrong = rssi > -60;
-            const styleClass = isStrong ? 'entry strong' : 'entry';
-
-            const html = `
-                <div class="${styleClass}">
-                    <span class="info">RSSI: ${rssi}</span> | ID: ${mac} <br>
-                    Name: ${name || "N/A"} <br>
-                    <span class="uuid">UUIDs: ${uuids}</span> <br>
-                    <span class="raw">Hex: ${manDataHex}</span>
-                </div>
-            `;
-            
-            // Einfügen am Anfang
-            logDiv.insertAdjacentHTML('afterbegin', html);
-
-            // Liste sauber halten (Max 50 Einträge, sonst crasht der Browser bei Flood)
-            if (logDiv.children.length > 50) {
-                logDiv.lastElementChild.remove();
-            }
+        function appendLog(text) {
+            const ta = document.getElementById('logArea');
+            ta.value = text + "\n" + ta.value; // Neuestes oben
         }
 
         async function startScan() {
-            if (isScanning) return;
-            document.getElementById('log').innerHTML = ""; // Clear
-            
             try {
-                // ALLES zulassen. Keine Filter.
+                document.getElementById('btnStart').classList.add('active');
+                
                 scanResult = await navigator.bluetooth.requestLEScan({
                     acceptAllAdvertisements: true,
                     keepRepeatedDevices: true
                 });
 
-                isScanning = true;
-                document.getElementById('status').innerText = "SCAN LÄUFT - RAW MODE";
+                document.getElementById('status').innerText = "SCAN LÄUFT... Apple/Samsung/Audio gefiltert.";
 
                 navigator.bluetooth.addEventListener('advertisementreceived', event => {
-                    // Daten aufbereiten
-                    const mac = event.device.id; // Browser ID
-                    const rssi = event.rssi;
-                    const name = event.device.name;
-                    
-                    // UUIDs sammeln
-                    let uuids = [];
-                    if (event.uuids) uuids = event.uuids.map(u => u.split('-')[0]); // Nur der Anfang der UUID
-
-                    // Manufacturer Data zu Hex String konvertieren
-                    let hexStr = "";
-                    event.manufacturerData.forEach((value, key) => {
-                        // Key ist die Company ID (z.B. 89 für 0x0059)
-                        let companyIdHex = key.toString(16).padStart(4, '0'); 
-                        hexStr += `[CID:${companyIdHex}] `; // Zeige Company ID explizit an
-                        
-                        for (let i = 0; i < value.byteLength; i++) {
-                            hexStr += value.getUint8(i).toString(16).padStart(2, '0');
-                        }
-                        hexStr += " ";
-                    });
-
-                    logToScreen(mac, rssi, name, uuids.join(', '), hexStr);
+                    processPacket(event);
                 });
 
             } catch (error) {
                 alert("Fehler: " + error);
+                document.getElementById('btnStart').classList.remove('active');
             }
         }
 
-        function stopScan() {
-            if (scanResult) {
-                scanResult.stop();
-                isScanning = false;
-                document.getElementById('status').innerText = "GESTOPPT (Liste eingefroren)";
+        function processPacket(event) {
+            const rssi = event.rssi;
+            const name = event.device.name || "N/A";
+            const macID = event.device.id; // Browser ID
+
+            // 1. Daten extrahieren (Manufacturer Data)
+            let manHex = "";
+            let cidFound = "";
+            event.manufacturerData.forEach((value, key) => {
+                let cid = key.toString(16).padStart(4, '0');
+                cidFound = cid;
+                let data = "";
+                for (let i = 0; i < value.byteLength; i++) {
+                    data += value.getUint8(i).toString(16).padStart(2, '0');
+                }
+                manHex += `[CID:${cid}] ${data} `;
+            });
+
+            // 2. Daten extrahieren (Service Data) - DAS IST NEU
+            let svcHex = "";
+            if (event.serviceData) {
+                event.serviceData.forEach((value, key) => {
+                    let data = "";
+                    for (let i = 0; i < value.byteLength; i++) {
+                        data += value.getUint8(i).toString(16).padStart(2, '0');
+                    }
+                    svcHex += `[SVC:${key}] ${data} `;
+                });
             }
+
+            // 3. UUIDs
+            let uuids = event.uuids ? event.uuids.join(", ") : "";
+
+            // 4. FILTERUNG (Müll rauswerfen)
+            if (IGNORE_CIDS.includes(cidFound)) return;
+            if (IGNORE_NAMES.some(n => name.includes(n))) return;
+
+            // 5. Output Formatieren (Nur wenn Payload existiert oder RSSI stark ist)
+            // Wir wollen "Geister" sehen (starkes Signal, aber keine Daten)
+            if (manHex === "" && svcHex === "" && rssi < -80) return; // Schwache Geister ignorieren
+
+            const timestamp = new Date().toLocaleTimeString();
+            let entry = `[${timestamp}] RSSI:${rssi} | Name:${name}`;
+            
+            if (manHex) entry += `\n  MAN: ${manHex}`;
+            if (svcHex) entry += `\n  SVC: ${svcHex}`; // Hier könnten die FTS Daten stecken!
+            if (uuids)  entry += `\n  UUID: ${uuids}`;
+            if (!manHex && !svcHex) entry += `\n  [KEINE PAYLOAD DATEN]`;
+            
+            entry += "\n--------------------------------";
+            
+            appendLog(entry);
+        }
+
+        function stopScan() {
+            if (scanResult) scanResult.stop();
+            document.getElementById('status').innerText = "GESTOPPT.";
+            document.getElementById('btnStart').classList.remove('active');
+        }
+
+        function copyLog() {
+            const ta = document.getElementById('logArea');
+            ta.select();
+            document.execCommand('copy'); // Fallback für ältere Webviews
+            navigator.clipboard.writeText(ta.value).then(() => alert("Kopiert!"));
+        }
+        
+        function clearLog() {
+             document.getElementById('logArea').value = "";
         }
     </script>
 </body>
 </html>
- 
