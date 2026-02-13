@@ -1,976 +1,1148 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0a0e14">
-    <title>BLE INDUSTRIAL — TARGET: YVES</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#060a10">
+    <title>BLE DIAG — TARGET: YVES</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg:      #060a10;
-            --surface: #0c1118;
-            --card:    #111820;
-            --border:  #1a2535;
-            --border2: #243040;
-            --neon:    #00ff9f;
-            --target:  #ff00ff;
-            --blue:    #38bdf8;
-            --amber:   #fbbf24;
-            --red:     #ef4444;
-            --orange:  #f97316;
-            --text:    #c8d6e5;
-            --dim:     #4a5a6a;
-            --mono:    'JetBrains Mono', monospace;
-            --ui:      'IBM Plex Sans', sans-serif;
-            --r:       6px;
+            --bg:#060a10;--s1:#0c1118;--s2:#111820;--card:#0e141c;
+            --b1:#1a2535;--b2:#243040;
+            --neon:#00ff9f;--tgt:#ff00ff;--blue:#38bdf8;--amber:#fbbf24;
+            --red:#ef4444;--orange:#f97316;--cyan:#22d3ee;--lime:#a3e635;
+            --txt:#c8d6e5;--dim:#4a5a6a;--dim2:#2a3a4a;
+            --m:'JetBrains Mono',monospace;--u:'IBM Plex Sans',sans-serif;
+            --r:6px;
         }
         *{box-sizing:border-box;margin:0;padding:0}
         html,body{height:100%;overflow:hidden}
-        body{background:var(--bg);color:var(--text);font-family:var(--ui)}
+        body{background:var(--bg);color:var(--txt);font-family:var(--u)}
         #app{display:flex;flex-direction:column;height:100dvh}
 
-        /* ─── TOPBAR ─── */
-        #topbar{
-            padding:10px 16px;background:var(--surface);
-            border-bottom:1px solid var(--border);
-            display:flex;align-items:center;justify-content:space-between;
-            flex-shrink:0;
-        }
-        #topbar h1{font-family:var(--mono);font-size:12px;color:var(--neon);letter-spacing:2px;font-weight:700}
-        .pill{
-            font-family:var(--mono);font-size:9px;font-weight:600;
-            padding:3px 10px;border-radius:20px;
-            background:rgba(255,255,255,0.03);border:1px solid var(--border);
-            color:var(--dim);text-transform:uppercase;letter-spacing:1px;
-            transition:all .3s;
-        }
-        .pill.scanning{color:var(--amber);border-color:var(--amber);animation:pulse 1.2s infinite}
-        .pill.target{color:var(--target);border-color:var(--target);animation:pulse .6s infinite;box-shadow:0 0 12px rgba(255,0,255,.2)}
-        .pill.connected{color:var(--neon);border-color:var(--neon);box-shadow:0 0 8px rgba(0,255,159,.15)}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        /* TOPBAR */
+        #top{padding:8px 14px;background:var(--s1);border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+        #top h1{font-family:var(--m);font-size:11px;color:var(--neon);letter-spacing:2px;font-weight:700}
+        .pill{font-family:var(--m);font-size:8px;font-weight:600;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,.03);border:1px solid var(--b1);color:var(--dim);text-transform:uppercase;letter-spacing:1px;transition:all .3s}
+        .pill.sc{color:var(--amber);border-color:var(--amber);animation:pls 1.2s infinite}
+        .pill.tg{color:var(--tgt);border-color:var(--tgt);animation:pls .6s infinite;box-shadow:0 0 10px rgba(255,0,255,.2)}
+        .pill.cn{color:var(--neon);border-color:var(--neon);box-shadow:0 0 8px rgba(0,255,159,.15)}
+        .pill.wt{color:var(--cyan);border-color:var(--cyan);animation:pls .8s infinite}
+        @keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
 
-        /* ─── CONTENT ─── */
+        /* CONTENT */
         #content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-        .tab{display:none;padding:12px 14px}
-        .tab.active{display:block}
+        .tab{display:none;padding:10px 12px}
+        .tab.on{display:block}
 
-        /* ─── BUTTONS ─── */
-        .btn{
-            width:100%;padding:12px;border-radius:var(--r);
-            font-family:var(--mono);font-size:11px;font-weight:600;
-            text-transform:uppercase;letter-spacing:1px;cursor:pointer;
-            border:1px solid var(--neon);color:var(--neon);
-            background:rgba(0,255,159,.04);
-            -webkit-tap-highlight-color:transparent;
-            transition:background .15s;
-        }
+        /* BUTTONS */
+        .btn{width:100%;padding:11px;border-radius:var(--r);font-family:var(--m);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;cursor:pointer;border:1px solid var(--neon);color:var(--neon);background:rgba(0,255,159,.04);-webkit-tap-highlight-color:transparent;transition:background .15s}
         .btn:active{background:rgba(0,255,159,.12)}
-        .btn.stop{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.04)}
-        .btn.stop:active{background:rgba(239,68,68,.12)}
-        .btn.accent{border-color:var(--target);color:var(--target);background:rgba(255,0,255,.04)}
-        .btn:disabled{opacity:.25;pointer-events:none}
-        .btn-grid{display:grid;gap:8px;margin-bottom:10px}
-        .btn-grid.c2{grid-template-columns:1fr 1fr}
+        .btn.red{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.04)}
+        .btn.mag{border-color:var(--tgt);color:var(--tgt);background:rgba(255,0,255,.04)}
+        .btn.cyan{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,.04)}
+        .btn:disabled{opacity:.2;pointer-events:none}
+        .bg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+        .bg2 .btn{margin:0}
 
-        /* ─── SCAN STATS BAR ─── */
-        .stats-bar{
-            display:flex;justify-content:space-between;
-            font-family:var(--mono);font-size:9px;color:var(--dim);
-            padding:6px 2px;border-bottom:1px solid var(--border);
-            margin-bottom:8px;
-        }
-        .stats-bar .v{color:var(--text)}
-        .stats-bar .t{color:var(--target);font-weight:700}
+        /* STATS */
+        .sbar{display:flex;flex-wrap:wrap;gap:2px 10px;font-family:var(--m);font-size:8px;color:var(--dim);padding:4px 0;border-bottom:1px solid var(--b1);margin-bottom:6px}
+        .sbar .v{color:var(--txt)}.sbar .t{color:var(--tgt);font-weight:700}.sbar .g{color:var(--neon)}
 
-        /* ─── DEVICE LIST ─── */
-        #devices{display:flex;flex-direction:column;gap:6px}
+        /* DEVICE LIST */
+        #devs{display:flex;flex-direction:column;gap:5px}
+        .dv{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:9px 10px;position:relative;transition:all .25s}
+        .dv.stale{opacity:.3}
+        .dv.tgt{order:-1;border:1.5px solid var(--tgt);background:linear-gradient(135deg,rgba(255,0,255,.04),rgba(255,0,255,.01));box-shadow:0 0 18px rgba(255,0,255,.08);cursor:pointer}
+        .dv.tgt:active{background:rgba(255,0,255,.1)}
+        .dv.conn{border-color:var(--neon);box-shadow:0 0 12px rgba(0,255,159,.1)}
+        .dv .dtag{position:absolute;top:-7px;left:8px;font-family:var(--m);font-size:7px;font-weight:800;padding:1px 6px;border-radius:3px;letter-spacing:.5px;color:#fff;background:var(--tgt)}
+        .dv.conn .dtag{background:var(--neon);color:#000}
 
-        .dev{
-            background:var(--card);border:1px solid var(--border);
-            border-radius:var(--r);padding:10px 12px;
-            position:relative;transition:all .25s;
-        }
-        .dev.stale{opacity:.35}
-        .dev.is-target{
-            order:-1;
-            border:1.5px solid var(--target);
-            background:linear-gradient(135deg,rgba(255,0,255,.04),rgba(255,0,255,.01));
-            box-shadow:0 0 20px rgba(255,0,255,.08);
-            cursor:pointer;
-        }
-        .dev.is-target:active{background:rgba(255,0,255,.1)}
-        .dev.is-target .tag-target{
-            position:absolute;top:-8px;left:10px;
-            background:var(--target);color:#fff;
-            font-family:var(--mono);font-size:7px;font-weight:800;
-            padding:2px 7px;border-radius:3px;letter-spacing:.5px;
-        }
-        .dev.is-connected{
-            border-color:var(--neon);
-            box-shadow:0 0 15px rgba(0,255,159,.1);
-        }
-        .dev.is-connected .tag-target{background:var(--neon);color:#000}
+        .dv-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+        .dv-n{font-family:var(--m);font-weight:600;color:#fff;font-size:11px;word-break:break-all}
+        .dv-n.no{color:var(--dim);font-style:italic;font-weight:400}
+        .dv-r{font-family:var(--m);font-weight:800;font-size:12px;white-space:nowrap;flex-shrink:0}
+        .dv-r small{font-size:7px;font-weight:400}
 
-        .dev-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-        .dev-name{font-family:var(--mono);font-weight:600;color:#fff;font-size:12px;word-break:break-all}
-        .dev-name.none{color:var(--dim);font-style:italic;font-weight:400}
-        .dev-rssi{font-family:var(--mono);font-weight:800;font-size:13px;white-space:nowrap;flex-shrink:0}
+        .sigbar{height:2px;border-radius:1px;margin:4px 0 3px;transition:width .4s,background .4s}
+        .dv-tags{display:flex;flex-wrap:wrap;gap:3px 6px;margin-top:2px}
+        .dtg{font-family:var(--m);font-size:7px;font-weight:600;padding:1px 4px;border-radius:3px;background:rgba(255,255,255,.04);color:var(--dim)}
+        .dtg.mfr{color:var(--amber);background:rgba(251,191,36,.07)}
+        .dtg.svc{color:var(--blue);background:rgba(56,189,248,.07)}
+        .dtg.adv{color:var(--cyan);background:rgba(34,211,238,.07)}
+        .dv-hex{font-family:var(--m);font-size:7px;color:var(--amber);margin-top:2px;opacity:.65}
+        .dv-act{font-family:var(--m);font-size:7px;font-weight:700;color:var(--tgt);letter-spacing:1px;text-transform:uppercase;margin-top:4px}
 
-        .signal-bar{height:3px;border-radius:2px;margin:6px 0 4px;transition:width .4s,background .4s}
+        /* GATT */
+        .gbox{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:8px 10px;margin-bottom:6px;font-family:var(--m);font-size:9px;line-height:1.8}
+        .gbox .l{color:var(--dim)}.gbox .w{color:#fff}.gbox .g{color:var(--neon)}.gbox .t{color:var(--tgt)}.gbox .c{color:var(--cyan)}.gbox .a{color:var(--amber)}
 
-        .dev-row{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:3px}
-        .dev-tag{
-            font-family:var(--mono);font-size:8px;font-weight:600;
-            padding:1px 5px;border-radius:3px;
-            background:rgba(255,255,255,.05);color:var(--dim);
-        }
-        .dev-tag.mfr{color:var(--amber);background:rgba(251,191,36,.08)}
-        .dev-tag.svc{color:var(--blue);background:rgba(56,189,248,.08)}
-        .dev-tag.id{color:var(--dim)}
-        .dev-tag.cnt{color:var(--text)}
+        .gsvc{border:1px solid var(--b1);border-radius:var(--r);margin-bottom:6px;overflow:hidden;background:#000}
+        .gsvc-h{padding:6px 10px;background:var(--s1);font-family:var(--m);font-size:9px;color:var(--blue);font-weight:600}
+        .gsvc-h small{display:block;font-size:7px;color:var(--dim);font-weight:400;margin-top:1px;word-break:break-all}
 
-        .dev-action{
-            display:block;margin-top:6px;
-            font-family:var(--mono);font-size:8px;font-weight:700;
-            color:var(--target);letter-spacing:1px;text-transform:uppercase;
-        }
+        .gch{padding:7px 10px;border-top:1px solid var(--b1);font-family:var(--m);font-size:9px}
+        .gch-n{font-weight:600;color:#fff}
+        .gch-f{font-size:7px;color:var(--amber);margin-top:1px}
+        .gch-u{font-size:7px;color:var(--dim);margin-top:1px;word-break:break-all}
+        .gval{display:block;margin-top:3px;padding:4px 5px;background:var(--bg);border-radius:3px;color:var(--neon);font-size:8px;line-height:1.5;overflow-wrap:anywhere;min-height:16px}
+        .gval .delta{color:var(--tgt);font-weight:700;text-decoration:underline}
+        .gval .prev{color:var(--dim);font-size:7px;display:block;margin-top:2px}
+        .bdg{display:inline-block;font-size:6px;font-weight:700;padding:1px 3px;border-radius:2px;margin-left:3px;vertical-align:middle;letter-spacing:.3px}
+        .bdg.n{background:var(--tgt);color:#fff}
+        .bdg.i{background:var(--orange);color:#fff}
+        .bdg.sub{background:var(--cyan);color:#000}
 
-        /* ─── GATT ─── */
-        .gatt-box{
-            background:var(--card);border:1px solid var(--border);
-            border-radius:var(--r);padding:10px 12px;margin-bottom:8px;
-            font-family:var(--mono);font-size:10px;line-height:1.8;
-        }
-        .gatt-box .lbl{color:var(--dim)}
-        .gatt-box .val{color:#fff}
-        .gatt-box .val.on{color:var(--neon)}
-        .gatt-box .val.tgt{color:var(--target)}
+        /* TELEMETRY */
+        .telem-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+        .telem-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:8px 10px}
+        .telem-card .tl{font-family:var(--m);font-size:7px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+        .telem-card .tv{font-family:var(--m);font-size:18px;font-weight:800;color:var(--neon);margin-top:2px}
+        .telem-card .tv.warn{color:var(--amber)}
+        .telem-card .tv.crit{color:var(--red)}
+        .telem-card .ts{font-family:var(--m);font-size:7px;color:var(--dim);margin-top:2px}
 
-        .gatt-svc{
-            border:1px solid var(--border);border-radius:var(--r);
-            margin-bottom:8px;overflow:hidden;background:#000;
-        }
-        .gatt-svc-head{
-            padding:8px 10px;background:var(--surface);
-            font-family:var(--mono);font-size:10px;color:var(--blue);font-weight:600;
-        }
-        .gatt-svc-head small{display:block;font-size:8px;color:var(--dim);font-weight:400;margin-top:2px;word-break:break-all}
+        /* EVENT STREAM */
+        #evt-stream{max-height:40vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+        .evt{font-family:var(--m);font-size:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);line-height:1.4;display:flex;gap:6px}
+        .evt .ets{color:var(--dim);flex-shrink:0;width:70px}
+        .evt .esrc{color:var(--cyan);flex-shrink:0;width:80px;overflow:hidden;text-overflow:ellipsis}
+        .evt .eval{color:var(--neon);flex:1;overflow-wrap:anywhere}
+        .evt.delta .eval{color:var(--tgt);font-weight:600}
+        .evt.btn-evt .esrc{color:var(--amber)}
 
-        .gatt-char{
-            padding:8px 10px;border-top:1px solid var(--border);
-            font-family:var(--mono);font-size:10px;
-        }
-        .gatt-char-name{font-weight:600;color:#fff}
-        .gatt-char-flags{font-size:8px;color:var(--amber);margin-top:2px}
-        .gatt-char-uuid{font-size:8px;color:var(--dim);margin-top:1px;word-break:break-all}
-        .gatt-val{
-            display:block;margin-top:4px;padding:5px 6px;
-            background:var(--bg);border-radius:4px;
-            color:var(--neon);font-size:9px;line-height:1.6;
-            overflow-wrap:anywhere;min-height:20px;
-        }
-        .badge{
-            display:inline-block;font-size:7px;font-weight:700;
-            padding:1px 4px;border-radius:2px;margin-left:4px;
-            vertical-align:middle;letter-spacing:.3px;
-        }
-        .badge.notify{background:var(--target);color:#fff}
-        .badge.indicate{background:var(--orange);color:#fff}
+        /* LOG */
+        .ll{font-family:var(--m);font-size:8px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.02);line-height:1.4}
+        .ll.t{color:var(--tgt);font-weight:600}.ll.e{color:var(--red)}.ll.w{color:var(--amber)}.ll.c{color:var(--cyan)}
 
-        /* ─── LOG ─── */
-        .log-line{font-family:var(--mono);font-size:9px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);line-height:1.5}
-        .log-line.t{color:var(--target);font-weight:600}
-        .log-line.e{color:var(--red)}
-        .log-line.w{color:var(--amber)}
+        /* NAV */
+        #nav{display:grid;grid-template-columns:repeat(4,1fr);background:var(--s1);border-top:1px solid var(--b1);padding-bottom:env(safe-area-inset-bottom);flex-shrink:0}
+        .nb{padding:10px 4px;border:none;background:transparent;color:var(--dim);font-family:var(--m);font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;-webkit-tap-highlight-color:transparent;border-top:2px solid transparent;transition:all .2s}
+        .nb.on{color:var(--neon);border-top-color:var(--neon)}
 
-        /* ─── NAVBAR ─── */
-        #nav{
-            display:grid;grid-template-columns:repeat(3,1fr);
-            background:var(--surface);border-top:1px solid var(--border);
-            padding-bottom:env(safe-area-inset-bottom);flex-shrink:0;
-        }
-        .nav-b{
-            padding:11px 8px;border:none;background:transparent;
-            color:var(--dim);font-family:var(--mono);font-size:9px;
-            font-weight:600;text-transform:uppercase;letter-spacing:1px;
-            -webkit-tap-highlight-color:transparent;
-            border-top:2px solid transparent;transition:all .2s;
-        }
-        .nav-b.on{color:var(--neon);border-top-color:var(--neon)}
-
-        .note{
-            font-family:var(--mono);font-size:9px;color:var(--dim);
-            padding:8px 10px;border:1px dashed var(--border);border-radius:var(--r);
-            margin-bottom:10px;line-height:1.8;
-        }
+        .note{font-family:var(--m);font-size:8px;color:var(--dim);padding:6px 8px;border:1px dashed var(--b1);border-radius:var(--r);margin-bottom:8px;line-height:1.8}
         .note code{color:var(--amber);font-weight:600}
-        .note em{color:var(--text);font-style:normal}
+        .note em{color:var(--txt);font-style:normal}
+
+        .section-head{font-family:var(--m);font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:2px;padding:8px 0 4px;border-bottom:1px solid var(--b1);margin-bottom:6px}
     </style>
 </head>
 <body>
 <div id="app">
-    <div id="topbar">
-        <h1>BLE // YVES</h1>
+    <div id="top">
+        <h1>BLE DIAG</h1>
         <div class="pill" id="pill">IDLE</div>
     </div>
 
     <div id="content">
-        <!-- ══ SCAN ══ -->
-        <div class="tab active" id="tab-scan">
+        <!-- ═══ SCAN ═══ -->
+        <div class="tab on" id="tab-scan">
             <div class="note" id="scan-note">
-                Passiver BLE-Scan via <code>requestLEScan()</code><br>
+                <code>requestLEScan()</code> — passiver Scan ohne Picker<br>
                 Flag: <code>chrome://flags/#enable-experimental-web-platform-features</code><br>
-                <em>JBL-Geräte werden automatisch erkannt — antippen zum Verbinden.</em>
+                <em>JBL wird erkannt via Name, Manufacturer ID (0x0057) oder Service UUID (0xFE61).</em>
             </div>
-            <div class="btn-grid c2">
-                <button class="btn" id="btn-start" onclick="App.startScan()">▶ Scan</button>
-                <button class="btn stop" id="btn-stop" onclick="App.stopScan()" disabled>■ Stop</button>
+            <div class="bg2">
+                <button class="btn" id="btn-go" onclick="D.startScan()">▶ Scan</button>
+                <button class="btn red" id="btn-st" onclick="D.stopScan()" disabled>■ Stop</button>
             </div>
-            <div class="stats-bar" id="stats" style="display:none">
-                <span>Geräte: <span class="v" id="s-total">0</span></span>
-                <span>Targets: <span class="t" id="s-target">0</span></span>
-                <span>Pakete: <span class="v" id="s-pkts">0</span></span>
-                <span>Rate: <span class="v" id="s-rate">0</span>/s</span>
+            <div class="sbar" id="stats" style="display:none">
+                <span>Geräte:<span class="v" id="s-tot">0</span></span>
+                <span>Targets:<span class="t" id="s-tgt">0</span></span>
+                <span>Pkts:<span class="v" id="s-pkt">0</span></span>
+                <span>Rate:<span class="g" id="s-rate">0</span>/s</span>
             </div>
-            <div id="devices"></div>
+            <div id="devs"></div>
         </div>
 
-        <!-- ══ GATT ══ -->
+        <!-- ═══ GATT ═══ -->
         <div class="tab" id="tab-gatt">
-            <div class="gatt-box" id="gatt-info">
-                <span class="lbl">Status:</span> <span class="val" id="g-state">Nicht verbunden</span><br>
-                <span class="lbl">Gerät:</span> <span class="val" id="g-name">—</span><br>
-                <span class="lbl">Services:</span> <span class="val" id="g-svcs">—</span>
-                <span class="lbl"> Notify:</span> <span class="val" id="g-notify">—</span>
+            <div class="gbox" id="gi">
+                <span class="l">Status:</span> <span class="w" id="g-st">Nicht verbunden</span><br>
+                <span class="l">Gerät:</span> <span class="w" id="g-nm">—</span><br>
+                <span class="l">Services:</span> <span class="w" id="g-sc">—</span>
+                <span class="l"> Notify:</span> <span class="c" id="g-ns">—</span>
+                <span class="l"> MTU:</span> <span class="a" id="g-mtu">—</span>
             </div>
-            <button class="btn stop" id="btn-dc" onclick="App.disconnect()" disabled>Disconnect</button>
-            <div id="gatt-list" style="margin-top:10px"></div>
+            <div class="bg2">
+                <button class="btn cyan" id="btn-wt" onclick="D.toggleWiretap()" disabled>⚡ Wiretap</button>
+                <button class="btn red" id="btn-dc" onclick="D.disconnect()" disabled>Disconnect</button>
+            </div>
+            <div class="section-head">TELEMETRY</div>
+            <div class="telem-grid" id="telem">
+                <div class="telem-card"><div class="tl">Battery</div><div class="tv" id="t-bat">—</div><div class="ts" id="t-bat-s"></div></div>
+                <div class="telem-card"><div class="tl">ADV Interval</div><div class="tv" id="t-adv">—</div><div class="ts" id="t-adv-s"></div></div>
+                <div class="telem-card"><div class="tl">RSSI (live)</div><div class="tv" id="t-rssi">—</div><div class="ts" id="t-rssi-s"></div></div>
+                <div class="telem-card"><div class="tl">MTU</div><div class="tv" id="t-mtu">—</div><div class="ts" id="t-mtu-s"></div></div>
+            </div>
+            <div class="section-head">GATT SERVICES</div>
+            <div id="gatt-list"></div>
         </div>
 
-        <!-- ══ LOG ══ -->
+        <!-- ═══ EVENTS ═══ -->
+        <div class="tab" id="tab-evt">
+            <div class="gbox">
+                <span class="l">Wiretap Events:</span> <span class="c" id="e-cnt">0</span>
+                <span class="l"> Deltas:</span> <span class="t" id="e-dlt">0</span>
+                <span class="l"> Button:</span> <span class="a" id="e-btn">0</span>
+            </div>
+            <button class="btn" onclick="D.exportEvents()" style="margin-bottom:6px">Export Events</button>
+            <div id="evt-stream"></div>
+        </div>
+
+        <!-- ═══ LOG ═══ -->
         <div class="tab" id="tab-log">
-            <div class="btn-grid c2">
-                <button class="btn" onclick="App.exportLog()">Export</button>
-                <button class="btn stop" onclick="App.clearLog()">Clear</button>
+            <div class="bg2">
+                <button class="btn" onclick="D.exportLog()">Export</button>
+                <button class="btn red" onclick="D.clearLog()">Clear</button>
             </div>
             <div id="log-list"></div>
         </div>
     </div>
 
     <div id="nav">
-        <button class="nav-b on" data-t="tab-scan" onclick="App.tab(this)">Radar</button>
-        <button class="nav-b" data-t="tab-gatt" onclick="App.tab(this)">GATT</button>
-        <button class="nav-b" data-t="tab-log" onclick="App.tab(this)">Log</button>
+        <button class="nb on" data-t="tab-scan" onclick="D.tab(this)">Radar</button>
+        <button class="nb" data-t="tab-gatt" onclick="D.tab(this)">GATT</button>
+        <button class="nb" data-t="tab-evt" onclick="D.tab(this)">Events</button>
+        <button class="nb" data-t="tab-log" onclick="D.tab(this)">Log</button>
     </div>
 </div>
 
 <script>
-const App = (() => {
+const D = (() => {
     'use strict';
 
-    /* ═══════════════════════════════════════════════
-       STATE
-    ═══════════════════════════════════════════════ */
+    // ═══════════════════════════════════════
+    //  STATE
+    // ═══════════════════════════════════════
     const S = {
-        devs: new Map(),          // id → DeviceEntry
-        scan: null,               // BleScanHandle
+        devs: new Map(),
+        scan: null,
         scanning: false,
-        pktCount: 0,
-        pktLast: 0,
+        totalPkts: 0,
+        pktWindow: 0,
         pktRate: 0,
-        rateTimer: null,
 
         gattServer: null,
         gattDevice: null,
         connId: null,
         notifySubs: [],
+        wiretapActive: false,
+
+        // Telemetry
+        batteryHistory: [],
+        advIntervals: new Map(),   // deviceId → [timestamps]
+        mtuEstimate: null,
+
+        // Delta detection
+        charPrevValues: new Map(), // charUUID → hex string
+
+        // Events
+        events: [],
+        deltaCount: 0,
+        buttonCount: 0,
+
         logs: [],
+        timers: {},
     };
 
-    /* ═══════════════════════════════════════════════
-       DEVICE ENTRY SHAPE
-    ═══════════════════════════════════════════════ */
-    // { device, names: Set, bestName, rssi, txPower,
-    //   mfr: Map<companyId, {name,hex}>, svcUuids: Set, svcData: Map,
-    //   isTarget, firstSeen, lastSeen, count, stale }
-
-    /* ═══════════════════════════════════════════════
-       KNOWN DATABASE
-    ═══════════════════════════════════════════════ */
-    const MFR_DB = {
-        0x0057:'Harman/JBL', 0x004C:'Apple', 0x0006:'Microsoft',
-        0x00E0:'Google', 0x0075:'Samsung', 0x0059:'Nordic',
-        0x000D:'TI', 0x000F:'Broadcom', 0x0003:'IBM',
-        0x001D:'Qualcomm', 0x0046:'MediaTek', 0x0087:'Garmin',
-        0x02FF:'Xiaomi',
+    // ═══════════════════════════════════════
+    //  DATABASES
+    // ═══════════════════════════════════════
+    const MFR = {
+        0x0057:'Harman/JBL',0x004C:'Apple',0x0006:'Microsoft',
+        0x00E0:'Google',0x0075:'Samsung',0x0059:'Nordic',
+        0x000D:'TI',0x000F:'Broadcom',0x0003:'IBM (JBL-Crash)',
+        0x001D:'Qualcomm',0x0046:'MediaTek',0x0087:'Garmin',
+        0x02FF:'Xiaomi',0x0310:'Xiaomi',
     };
 
-    // JBL / Harman Identifikation — mehrere Methoden
-    const TARGET_MFR_IDS = new Set([0x0057]);   // Harman International
-    const TARGET_SVC_UUIDS = new Set([
-        '0000fe61-0000-1000-8000-00805f9b34fb',  // JBL custom
-    ]);
-    const TARGET_NAME_PATTERNS = [
-        /jbl/i, /yves/i, /harman/i,
-        /flip/i, /charge/i, /pulse/i, /xtreme/i, /boombox/i,
-        /clip/i, /go\s?\d/i, /tune/i, /live/i, /endurance/i,
-        /reflect/i, /quantum/i, /tour/i, /partybox/i,
+    const TGT_MFR = new Set([0x0057, 0x0003]);
+    const TGT_SVC = new Set(['0000fe61-0000-1000-8000-00805f9b34fb']);
+    const TGT_NAME = [
+        /jbl/i,/yves/i,/harman/i,/flip\s?\d/i,/charge\s?\d/i,
+        /pulse\s?\d/i,/xtreme/i,/boombox/i,/clip/i,/go\s?\d/i,
+        /tune/i,/live/i,/endurance/i,/reflect/i,/quantum/i,
+        /tour/i,/partybox/i,/soundgear/i,
     ];
 
-    // Services für GATT-Zugriff anfordern
-    const OPT_SERVICES = [
+    // MAC OUI check: 94:97:27 → Harman International Industries
+    const HARMAN_OUI = '949727';
+
+    const OPT_SVC = [
         'generic_access','generic_attribute','device_information',
         'battery_service','tx_power','immediate_alert','link_loss',
-        'human_interface_device',
-        0xFE61, 0xFEA0, 0xFE07, 0xFE08, 0xFEB2,
+        'human_interface_device','current_time_service',
+        0xFE61,0xFEA0,0xFE07,0xFE08,0xFE09,0xFEB2,
     ];
 
-    const SVC_NAMES = {
+    const SVC_N = {
         '00001800':'Generic Access','00001801':'Generic Attribute',
-        '0000180a':'Device Information','0000180f':'Battery',
+        '0000180a':'Device Info','0000180f':'Battery',
         '00001804':'TX Power','00001802':'Immediate Alert',
         '00001803':'Link Loss','00001812':'HID',
-        '0000fe61':'JBL Custom','0000fea0':'Google Fast Pair',
+        '0000fe61':'JBL Proprietary','0000fea0':'Google Fast Pair',
     };
-    const CHAR_NAMES = {
+    const CHR_N = {
         '2a00':'Device Name','2a01':'Appearance','2a04':'Conn Params',
         '2a05':'Service Changed','2a19':'Battery Level','2a23':'System ID',
-        '2a24':'Model Number','2a25':'Serial Number','2a26':'Firmware Rev',
-        '2a27':'Hardware Rev','2a28':'Software Rev','2a29':'Manufacturer',
-        '2a50':'PnP ID','2a07':'TX Power Level','2a06':'Alert Level',
+        '2a24':'Model Number','2a25':'Serial Number','2a26':'FW Rev',
+        '2a27':'HW Rev','2a28':'SW Rev','2a29':'Manufacturer',
+        '2a50':'PnP ID','2a07':'TX Power','2a06':'Alert Level',
     };
 
-    /* ═══════════════════════════════════════════════
-       LOGGING
-    ═══════════════════════════════════════════════ */
-    function log(msg, type = '') {
-        const ts = new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:1});
-        S.logs.push({ts, msg, type});
+    // Known JBL button/event characteristics (common patterns)
+    const BUTTON_CHARS = new Set(['2a06','2a52']);
+    const LIKELY_BUTTON_SVCS = new Set(['0000fe61-0000-1000-8000-00805f9b34fb']);
+
+    // ═══════════════════════════════════════
+    //  LOGGING
+    // ═══════════════════════════════════════
+    function log(msg, type='') {
+        const ts = _ts();
+        S.logs.push({ts,msg,type});
         const el = document.createElement('div');
-        el.className = `log-line ${type === 'target' ? 't' : type === 'error' ? 'e' : type === 'warn' ? 'w' : ''}`;
+        el.className = `ll ${type==='target'?'t':type==='error'?'e':type==='warn'?'w':type==='cyber'?'c':''}`;
         el.textContent = `${ts}  ${msg}`;
-        document.getElementById('log-list').prepend(el);
-        // Cap log DOM at 500
         const c = document.getElementById('log-list');
-        while (c.children.length > 500) c.removeChild(c.lastChild);
+        c.prepend(el);
+        while (c.children.length > 800) c.removeChild(c.lastChild);
     }
 
-    /* ═══════════════════════════════════════════════
-       TABS
-    ═══════════════════════════════════════════════ */
+    function _ts() {
+        const d = new Date();
+        return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+            + '.' + String(d.getMilliseconds()).padStart(3,'0');
+    }
+
+    // ═══════════════════════════════════════
+    //  TABS
+    // ═══════════════════════════════════════
     function tab(btn) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.nav-b').forEach(b => b.classList.remove('on'));
-        document.getElementById(btn.dataset.t).classList.add('active');
+        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+        document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+        document.getElementById(btn.dataset.t).classList.add('on');
         btn.classList.add('on');
     }
     function goTab(id) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.nav-b').forEach(b => b.classList.remove('on'));
-        document.getElementById(id).classList.add('active');
-        document.querySelector(`[data-t="${id}"]`).classList.add('on');
+        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+        document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+        document.getElementById(id).classList.add('on');
+        const nb = document.querySelector(`[data-t="${id}"]`);
+        if (nb) nb.classList.add('on');
     }
 
-    /* ═══════════════════════════════════════════════
-       TARGET DETECTION (multi-method)
-    ═══════════════════════════════════════════════ */
-    function checkTarget(names, mfrIds, svcUuids) {
-        // 1) Name patterns
+    // ═══════════════════════════════════════
+    //  TARGET DETECTION (multi-vector)
+    // ═══════════════════════════════════════
+    function isTarget(names, mfrIds, svcUuids) {
         for (const n of names) {
             if (!n) continue;
-            for (const re of TARGET_NAME_PATTERNS) {
-                if (re.test(n)) return true;
-            }
+            for (const re of TGT_NAME) { if (re.test(n)) return true; }
         }
-        // 2) Manufacturer IDs
-        for (const id of mfrIds) {
-            if (TARGET_MFR_IDS.has(id)) return true;
-        }
-        // 3) Service UUIDs
-        for (const uuid of svcUuids) {
-            if (TARGET_SVC_UUIDS.has(uuid)) return true;
-        }
+        for (const id of mfrIds) { if (TGT_MFR.has(id)) return true; }
+        for (const u of svcUuids) { if (TGT_SVC.has(u)) return true; }
         return false;
     }
 
-    /* ═══════════════════════════════════════════════
-       SIGNAL HELPERS
-    ═══════════════════════════════════════════════ */
-    function rssiPct(r) { return r == null ? 0 : Math.max(0, Math.min(100, ((r + 100) / 70) * 100)); }
-    function rssiCol(r) {
-        if (r == null) return '#333';
-        if (r > -50) return '#00ff9f';
-        if (r > -65) return '#a3e635';
-        if (r > -75) return '#fbbf24';
-        if (r > -85) return '#f97316';
-        return '#ef4444';
+    // ═══════════════════════════════════════
+    //  SIGNAL
+    // ═══════════════════════════════════════
+    function rssiPct(r){return r==null?0:Math.max(0,Math.min(100,((r+100)/70)*100))}
+    function rssiCol(r){
+        if(r==null)return'#333';if(r>-50)return'#00ff9f';
+        if(r>-65)return'#a3e635';if(r>-75)return'#fbbf24';
+        if(r>-85)return'#f97316';return'#ef4444';
     }
 
-    /* ═══════════════════════════════════════════════
-       PASSIVE SCAN
-    ═══════════════════════════════════════════════ */
+    // ═══════════════════════════════════════
+    //  PASSIVE SCAN
+    // ═══════════════════════════════════════
     async function startScan() {
         if (!navigator.bluetooth) return alert('Web Bluetooth nicht verfügbar.');
         if (!navigator.bluetooth.requestLEScan) {
-            return alert('requestLEScan() fehlt!\n\nAktiviere:\nchrome://flags/#enable-experimental-web-platform-features\n\nChrome neu starten.');
+            return alert('requestLEScan() fehlt!\n\nchrome://flags/#enable-experimental-web-platform-features\n→ Enabled → Chrome neu starten');
         }
         try {
-            log('Scan wird gestartet…');
-            S.scan = await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
+            log('Scan wird gestartet…','cyber');
+            S.scan = await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true});
             S.scanning = true;
-            S.pktCount = 0;
-            S.pktLast = performance.now();
+            S.totalPkts = 0;
+            S.pktWindow = 0;
             navigator.bluetooth.addEventListener('advertisementreceived', onAdv);
-            // Packet-Rate Timer
-            S.rateTimer = setInterval(calcRate, 1000);
-            // Stale-Check Timer
-            S.staleTimer = setInterval(markStale, 3000);
-            updateScanUI();
-            log('Scan aktiv — empfange Advertisements.', 'target');
-        } catch (e) {
-            log(`Scan-Fehler: ${e.message}`, 'error');
+            S.timers.rate = setInterval(()=>{
+                S.pktRate = S.pktWindow;
+                S.pktWindow = 0;
+                const el = document.getElementById('s-rate');
+                if(el) el.textContent = S.pktRate;
+            },1000);
+            S.timers.stale = setInterval(markStale,3000);
+            scanUI(true);
+            log('Scan aktiv — Advertisements werden empfangen.','target');
+        } catch(e) {
+            log(`Scan-Fehler: ${e.message}`,'error');
         }
     }
 
     function stopScan() {
-        if (S.scan) { S.scan.stop(); S.scan = null; }
+        if(S.scan){S.scan.stop();S.scan=null}
         S.scanning = false;
-        navigator.bluetooth.removeEventListener('advertisementreceived', onAdv);
-        clearInterval(S.rateTimer);
-        clearInterval(S.staleTimer);
-        updateScanUI();
+        navigator.bluetooth.removeEventListener('advertisementreceived',onAdv);
+        clearInterval(S.timers.rate);
+        clearInterval(S.timers.stale);
+        scanUI(false);
         log('Scan gestoppt.');
-    }
-
-    function calcRate() {
-        const now = performance.now();
-        const dt = (now - S.pktLast) / 1000;
-        S.pktRate = dt > 0 ? Math.round(S.pktCount / dt) : 0;
-        // Reset for next window
-        S.pktCount = 0;
-        S.pktLast = now;
-        const el = document.getElementById('s-rate');
-        if (el) el.textContent = S.pktRate;
     }
 
     function markStale() {
         const now = Date.now();
-        let changed = false;
-        S.devs.forEach((d, id) => {
-            const wasStale = d.stale;
-            d.stale = (now - d.lastSeen) > 8000; // 8s kein Signal → stale
-            if (d.stale !== wasStale) {
-                changed = true;
-                renderCard(id);
-            }
+        S.devs.forEach((d,id)=>{
+            const was = d.stale;
+            d.stale = (now - d.lastSeen) > 10000;
+            if(d.stale !== was) renderCard(id);
         });
     }
 
-    function updateScanUI() {
-        const on = S.scanning;
-        document.getElementById('btn-start').disabled = on;
-        document.getElementById('btn-stop').disabled = !on;
-        document.getElementById('stats').style.display = on ? 'flex' : 'none';
-        document.getElementById('scan-note').style.display = on ? 'none' : 'block';
+    function scanUI(on) {
+        document.getElementById('btn-go').disabled = on;
+        document.getElementById('btn-st').disabled = !on;
+        document.getElementById('stats').style.display = on?'flex':'none';
+        document.getElementById('scan-note').style.display = on?'none':'block';
         updatePill();
     }
 
     function updatePill() {
         const p = document.getElementById('pill');
-        if (S.gattServer && S.gattServer.connected) {
-            p.textContent = 'CONNECTED'; p.className = 'pill connected';
-        } else if (S.scanning) {
-            let hasTgt = false;
-            S.devs.forEach(d => { if (d.isTarget && !d.stale) hasTgt = true; });
-            if (hasTgt) { p.textContent = 'TARGET'; p.className = 'pill target'; }
-            else { p.textContent = 'SCANNING'; p.className = 'pill scanning'; }
-        } else {
-            p.textContent = 'IDLE'; p.className = 'pill';
-        }
+        if(S.wiretapActive){p.textContent='WIRETAP';p.className='pill wt'}
+        else if(S.gattServer&&S.gattServer.connected){p.textContent='CONNECTED';p.className='pill cn'}
+        else if(S.scanning){
+            let ht=false;S.devs.forEach(d=>{if(d.isTarget&&!d.stale)ht=true});
+            if(ht){p.textContent='TARGET';p.className='pill tg'}
+            else{p.textContent='SCANNING';p.className='pill sc'}
+        } else {p.textContent='IDLE';p.className='pill'}
     }
 
-    /* ═══════════════════════════════════════════════
-       ADVERTISEMENT HANDLER
-    ═══════════════════════════════════════════════ */
-    // Throttle rendering: max 1 render per device per 300ms
-    const _renderTimers = new Map();
+    // ═══════════════════════════════════════
+    //  ADVERTISEMENT HANDLER
+    // ═══════════════════════════════════════
+    const _rt = new Map();
 
     function onAdv(ev) {
-        S.pktCount++;
+        S.totalPkts++;
+        S.pktWindow++;
         const dev = ev.device;
         const id = dev.id;
         const now = Date.now();
+        const nowPerf = performance.now();
 
-        // Existing or new entry
-        let entry = S.devs.get(id);
-        const isNew = !entry;
+        let e = S.devs.get(id);
+        const isNew = !e;
 
-        if (isNew) {
-            entry = {
-                device: dev,
-                names: new Set(),
-                bestName: null,
-                rssi: null,
-                txPower: null,
-                mfr: new Map(),
-                svcUuids: new Set(),
-                svcData: new Map(),
-                isTarget: false,
-                firstSeen: now,
-                lastSeen: now,
-                count: 0,
-                stale: false,
+        if(isNew) {
+            e = {
+                device:dev, names:new Set(), bestName:null,
+                rssi:null, txPower:null,
+                mfr:new Map(), svcUuids:new Set(), svcData:new Map(),
+                isTarget:false, firstSeen:now, lastSeen:now,
+                count:0, stale:false,
+                // Advertising interval tracking
+                advTimestamps:[], advIntervalMs:null, advIntervalJitter:null,
             };
-            S.devs.set(id, entry);
+            S.devs.set(id,e);
         }
 
-        // ── Collect ALL name sources ──
-        // Web Bluetooth liefert Namen unzuverlässig —
-        // wir sammeln aus allen verfügbaren Quellen
-        if (dev.name) entry.names.add(dev.name);
-        if (ev.name) entry.names.add(ev.name);
-        // Lokaler Name aus Scan-Response (manche Browser)
-        if (ev.localName) entry.names.add(ev.localName);
+        // ── Name collection (alle Quellen!) ──
+        const rawNames = [dev.name, ev.name];
+        // Chrome manchmal: event.device.name erst nach ein paar Paketen
+        try { if(ev.localName) rawNames.push(ev.localName); } catch(_){}
+        for(const n of rawNames) {
+            if(n && typeof n === 'string' && n.trim().length > 0) {
+                e.names.add(n.trim());
+            }
+        }
+        e.bestName = bestName(e.names);
 
-        // Bester Name: längster nicht-leerer
-        entry.bestName = resolveBestName(entry.names);
-
-        // ── RSSI & TX Power ──
-        if (ev.rssi != null) entry.rssi = ev.rssi;
-        if (ev.txPower != null) entry.txPower = ev.txPower;
+        // ── RSSI / TX ──
+        if(ev.rssi != null) e.rssi = ev.rssi;
+        if(ev.txPower != null) e.txPower = ev.txPower;
 
         // ── Manufacturer Data ──
-        if (ev.manufacturerData && ev.manufacturerData.size > 0) {
-            ev.manufacturerData.forEach((dv, companyId) => {
-                const bytes = safeBytes(dv);
-                const hex = bytesToHex(bytes);
-                entry.mfr.set(companyId, {
-                    label: MFR_DB[companyId] || `0x${companyId.toString(16).padStart(4,'0').toUpperCase()}`,
-                    hex,
-                    raw: bytes
+        if(ev.manufacturerData && ev.manufacturerData.size > 0) {
+            ev.manufacturerData.forEach((dv,cid)=>{
+                const b = safe(dv);
+                e.mfr.set(cid,{
+                    label: MFR[cid] || `0x${cid.toString(16).padStart(4,'0').toUpperCase()}`,
+                    hex: hex(b), raw:b
                 });
             });
         }
 
         // ── Service UUIDs ──
-        if (ev.uuids && ev.uuids.length > 0) {
-            ev.uuids.forEach(u => entry.svcUuids.add(String(u)));
-        }
+        if(ev.uuids) ev.uuids.forEach(u=>e.svcUuids.add(String(u)));
 
         // ── Service Data ──
-        if (ev.serviceData && ev.serviceData.size > 0) {
-            ev.serviceData.forEach((dv, uuid) => {
-                entry.svcData.set(String(uuid), bytesToHex(safeBytes(dv)));
+        if(ev.serviceData && ev.serviceData.size > 0) {
+            ev.serviceData.forEach((dv,uuid)=>{
+                e.svcData.set(String(uuid), hex(safe(dv)));
             });
         }
 
-        entry.lastSeen = now;
-        entry.count++;
-        entry.stale = false;
+        // ── Advertising Interval Tracking ──
+        e.advTimestamps.push(nowPerf);
+        if(e.advTimestamps.length > 50) e.advTimestamps.splice(0, e.advTimestamps.length - 50);
+        if(e.advTimestamps.length >= 3) {
+            const intervals = [];
+            for(let i=1; i<e.advTimestamps.length; i++) {
+                intervals.push(e.advTimestamps[i] - e.advTimestamps[i-1]);
+            }
+            const avg = intervals.reduce((a,b)=>a+b,0) / intervals.length;
+            const jitter = Math.sqrt(intervals.reduce((s,v)=>s+(v-avg)**2,0)/intervals.length);
+            e.advIntervalMs = Math.round(avg);
+            e.advIntervalJitter = Math.round(jitter);
+        }
 
-        // ── Target Detection (re-evaluate every time — name might arrive later!) ──
-        const wasTarget = entry.isTarget;
-        entry.isTarget = checkTarget(entry.names, [...entry.mfr.keys()], entry.svcUuids);
+        e.lastSeen = now;
+        e.count++;
+        e.stale = false;
 
-        if (entry.isTarget && !wasTarget) {
-            log(`★ TARGET ERKANNT: "${entry.bestName || id}" [RSSI: ${entry.rssi}]`, 'target');
-            if (navigator.vibrate) navigator.vibrate([150, 80, 150, 80, 300]);
-            updatePill();
+        // ── Target Detection (re-eval jedes Paket) ──
+        const was = e.isTarget;
+        e.isTarget = isTarget(e.names, [...e.mfr.keys()], e.svcUuids);
+        if(e.isTarget && !was) {
+            log(`★ TARGET: "${e.bestName||'(kein Name)'}" RSSI:${e.rssi} MFR:[${[...e.mfr.keys()].map(k=>'0x'+k.toString(16)).join(',')}]`,'target');
+            if(navigator.vibrate) navigator.vibrate([150,80,150,80,300]);
         }
 
         // ── Stats ──
-        let totalPkts = 0;
-        let tgtCount = 0;
-        S.devs.forEach(d => { totalPkts += d.count; if (d.isTarget) tgtCount++; });
-        document.getElementById('s-total').textContent = S.devs.size;
-        document.getElementById('s-target').textContent = tgtCount;
-        document.getElementById('s-pkts').textContent = totalPkts;
+        let tc=0; S.devs.forEach(d=>{if(d.isTarget)tc++});
+        document.getElementById('s-tot').textContent = S.devs.size;
+        document.getElementById('s-tgt').textContent = tc;
+        document.getElementById('s-pkt').textContent = S.totalPkts;
+
+        // ── Live RSSI telemetry for connected target ──
+        if(S.connId === id && e.rssi != null) {
+            const el = document.getElementById('t-rssi');
+            if(el){
+                el.textContent = e.rssi + ' dBm';
+                el.className = 'tv' + (e.rssi < -80 ? ' crit' : e.rssi < -65 ? ' warn' : '');
+            }
+            const es = document.getElementById('t-rssi-s');
+            if(es) es.textContent = `Δ±${e.advIntervalJitter||0}ms`;
+        }
+
+        // ── ADV interval telemetry ──
+        if(S.connId === id && e.advIntervalMs != null) {
+            const el = document.getElementById('t-adv');
+            if(el){
+                el.textContent = e.advIntervalMs + 'ms';
+                el.className = 'tv' + (e.advIntervalJitter > 100 ? ' crit' : e.advIntervalJitter > 30 ? ' warn' : '');
+            }
+            const es = document.getElementById('t-adv-s');
+            if(es) es.textContent = `Jitter: ±${e.advIntervalJitter}ms${e.advIntervalJitter>80?' ⚠ WATCHDOG?':''}`;
+        }
+
+        updatePill();
 
         // ── Throttled render ──
-        if (!_renderTimers.has(id)) {
-            _renderTimers.set(id, setTimeout(() => {
-                _renderTimers.delete(id);
-                renderCard(id);
-            }, isNew ? 0 : 300));
+        if(!_rt.has(id)){
+            _rt.set(id, setTimeout(()=>{_rt.delete(id);renderCard(id)}, isNew?0:350));
         }
     }
 
-    function resolveBestName(nameSet) {
-        if (nameSet.size === 0) return null;
+    function bestName(nameSet) {
+        if(!nameSet || nameSet.size===0) return null;
         let best = null;
-        for (const n of nameSet) {
-            if (!n || !n.trim()) continue;
-            if (!best || n.length > best.length) best = n;
+        for(const n of nameSet) {
+            if(!n||!n.trim()) continue;
+            if(!best || n.length > best.length) best = n;
         }
         return best;
     }
 
-    /* ═══════════════════════════════════════════════
-       DEVICE CARD RENDERING
-    ═══════════════════════════════════════════════ */
+    // ═══════════════════════════════════════
+    //  DEVICE CARD
+    // ═══════════════════════════════════════
     function renderCard(id) {
         const d = S.devs.get(id);
-        if (!d) return;
+        if(!d) return;
+        let c = document.querySelector(`[data-id="${id}"]`);
+        if(!c){c=document.createElement('div');c.dataset.id=id;document.getElementById('devs').appendChild(c)}
 
-        let card = document.querySelector(`[data-id="${id}"]`);
-        if (!card) {
-            card = document.createElement('div');
-            card.dataset.id = id;
-            document.getElementById('devices').appendChild(card);
-        }
+        const isCon = S.connId===id;
+        const cls=['dv'];
+        if(d.isTarget)cls.push('tgt');
+        if(isCon)cls.push('conn');
+        if(d.stale)cls.push('stale');
+        c.className = cls.join(' ');
 
-        const isCon = S.connId === id;
-        const cls = ['dev'];
-        if (d.isTarget) cls.push('is-target');
-        if (isCon) cls.push('is-connected');
-        if (d.stale) cls.push('stale');
-        card.className = cls.join(' ');
-
-        // Click handler nur für targets
-        if (d.isTarget && !isCon) {
-            card.onclick = () => connectDevice(id);
-        } else {
-            card.onclick = null;
-        }
+        if(d.isTarget && !isCon) {
+            c.onclick = ()=>connectDevice(id);
+            c.style.cursor='pointer';
+        } else {c.onclick=null;c.style.cursor='default'}
 
         const name = d.bestName;
         const pct = rssiPct(d.rssi);
-        const col = rssiColor(d.rssi);
+        const col = rssiCol(d.rssi);
 
         // Tags
         let tags = '';
-
-        // Manufacturer tags
-        d.mfr.forEach((m, cid) => {
-            tags += `<span class="dev-tag mfr" title="Company: 0x${cid.toString(16).padStart(4,'0')}">${m.label}</span>`;
+        d.mfr.forEach((m,cid)=>{
+            tags += `<span class="dtg mfr" title="0x${cid.toString(16).padStart(4,'0')}">${m.label}</span>`;
         });
+        d.svcUuids.forEach(u=>{tags+=`<span class="dtg svc">${shortU(u)}</span>`});
+        if(d.advIntervalMs!=null) tags+=`<span class="dtg adv">${d.advIntervalMs}ms ±${d.advIntervalJitter||0}</span>`;
+        tags += `<span class="dtg">×${d.count}</span>`;
 
-        // Service UUID tags
-        d.svcUuids.forEach(u => {
-            tags += `<span class="dev-tag svc">${shortUUID(u)}</span>`;
-        });
-
-        // Count tag
-        tags += `<span class="dev-tag cnt">×${d.count}</span>`;
-
-        // ID tag
-        tags += `<span class="dev-tag id">${id.substring(0, 16)}</span>`;
-
-        // Manufacturer data hex (für Targets anzeigen)
-        let mfrHex = '';
-        if (d.isTarget && d.mfr.size > 0) {
-            d.mfr.forEach((m) => {
-                mfrHex += `<div style="font-family:var(--mono);font-size:8px;color:var(--amber);margin-top:3px;opacity:.7">DATA: ${m.hex}</div>`;
-            });
+        // All known names
+        let nameDisplay;
+        if(d.names.size > 0) {
+            const allNames = [...d.names];
+            nameDisplay = allNames[0]; // primary
+            if(allNames.length > 1) nameDisplay += ` <span style="color:var(--dim);font-weight:400;font-size:8px">(+${allNames.slice(1).join(', ')})</span>`;
+        } else {
+            nameDisplay = null;
         }
 
-        // Service Data hex
-        let svcDataHex = '';
-        if (d.isTarget && d.svcData.size > 0) {
-            d.svcData.forEach((hex, uuid) => {
-                svcDataHex += `<div style="font-family:var(--mono);font-size:8px;color:var(--blue);margin-top:2px;opacity:.7">SVC ${shortUUID(uuid)}: ${hex}</div>`;
-            });
+        // MFR hex for targets
+        let extra = '';
+        if(d.isTarget) {
+            d.mfr.forEach(m=>{extra+=`<div class="dv-hex">MFR: ${m.hex}</div>`});
+            d.svcData.forEach((h,u)=>{extra+=`<div class="dv-hex">SVC ${shortU(u)}: ${h}</div>`});
         }
 
-        card.innerHTML = `
-            ${d.isTarget ? `<div class="tag-target">${isCon ? '● CONNECTED' : '★ TARGET — TAP CONNECT'}</div>` : ''}
-            <div class="dev-top">
-                <span class="${name ? 'dev-name' : 'dev-name none'}">${name || '[ kein Name ]'}</span>
-                <span class="dev-rssi" style="color:${col}">${d.rssi != null ? d.rssi : '—'}<small style="font-size:8px;font-weight:400"> dBm</small></span>
+        c.innerHTML = `
+            ${d.isTarget?`<div class="dtag">${isCon?'● CONNECTED':'★ TARGET — TAP CONNECT'}</div>`:''}
+            <div class="dv-top">
+                <span class="${nameDisplay?'dv-n':'dv-n no'}">${nameDisplay||'[ kein Name — ID: '+id.substring(0,12)+' ]'}</span>
+                <span class="dv-r" style="color:${col}">${d.rssi!=null?d.rssi:''}<small> dBm</small></span>
             </div>
-            <div class="signal-bar" style="width:${pct}%;background:${col}"></div>
-            <div class="dev-row">${tags}</div>
-            ${mfrHex}${svcDataHex}
+            <div class="sigbar" style="width:${pct}%;background:${col}"></div>
+            <div class="dv-tags">${tags}</div>
+            ${extra}
         `;
     }
 
-    /* ═══════════════════════════════════════════════
-       CONNECT FLOW
-    ═══════════════════════════════════════════════ */
+    // ═══════════════════════════════════════
+    //  CONNECT
+    // ═══════════════════════════════════════
     async function connectDevice(id) {
         const entry = S.devs.get(id);
-        if (!entry) return;
-
-        const name = entry.bestName || 'Unbekannt';
-        log(`Verbinde "${name}"…`);
-
-        // Scan pausieren
-        if (S.scanning) stopScan();
+        if(!entry) return;
+        const name = entry.bestName || id.substring(0,12);
+        log(`Verbinde "${name}"…`,'cyber');
+        if(S.scanning) stopScan();
 
         try {
-            // ── Breite Filter für den Chrome-Picker ──
-            // acceptAllDevices als Fallback, damit das Gerät
-            // IMMER im Picker erscheint — auch ohne Namen
+            // Breite Filter
             const filters = [];
-
-            // Alle bekannten Namen als exakte Filter
-            entry.names.forEach(n => {
-                if (n && n.trim()) filters.push({ name: n });
-            });
-
-            // JBL-Produktnamen-Prefixe
-            for (const prefix of ['JBL','jbl','Jbl','Yves','YVES','yves','Harman','HARMAN']) {
-                filters.push({ namePrefix: prefix });
+            entry.names.forEach(n=>{if(n&&n.trim())filters.push({name:n.trim()})});
+            for(const pf of['JBL','jbl','Jbl','Yves','YVES','yves','Harman','HARMAN','harman']){
+                filters.push({namePrefix:pf});
             }
 
-            let requestOpts;
-            if (filters.length > 0) {
-                requestOpts = { filters, optionalServices: OPT_SERVICES };
+            // Fallback: acceptAllDevices wenn komplett namenlos
+            let opts;
+            if(filters.length > 0) {
+                opts = {filters, optionalServices:OPT_SVC};
             } else {
-                requestOpts = { acceptAllDevices: true, optionalServices: OPT_SERVICES };
+                opts = {acceptAllDevices:true, optionalServices:OPT_SVC};
             }
 
-            log('Chrome-Picker öffnet sich — Gerät auswählen.', 'warn');
-            const device = await navigator.bluetooth.requestDevice(requestOpts);
+            log('Chrome-Picker öffnet sich.','warn');
+            const device = await navigator.bluetooth.requestDevice(opts);
+            if(!device.gatt){log('GATT nicht verfügbar.','error');return}
 
-            if (!device.gatt) {
-                log('GATT nicht verfügbar.', 'error');
-                return;
-            }
-
-            device.addEventListener('gattserverdisconnected', () => {
-                log(`"${device.name || name}" getrennt.`, 'error');
-                S.gattServer = null;
-                S.gattDevice = null;
-                S.connId = null;
-                S.notifySubs = [];
-                updateGattUI();
-                renderCard(id);
-                updatePill();
+            device.addEventListener('gattserverdisconnected',()=>{
+                log(`"${device.name||name}" getrennt.`,'error');
+                S.gattServer=null;S.gattDevice=null;S.connId=null;
+                S.notifySubs=[];S.wiretapActive=false;
+                gattUI();renderCard(id);updatePill();
             });
 
             const server = await device.gatt.connect();
-            S.gattServer = server;
-            S.gattDevice = device;
-            S.connId = id;
+            S.gattServer=server;S.gattDevice=device;S.connId=id;
 
-            // Name aus GATT-Device übernehmen (oft zuverlässiger)
-            if (device.name) entry.names.add(device.name);
-            entry.bestName = resolveBestName(entry.names);
+            if(device.name){entry.names.add(device.name);entry.bestName=bestName(entry.names)}
 
-            log(`GATT verbunden: "${device.name || name}"`, 'target');
-            updateGattUI();
-            renderCard(id);
-            updatePill();
+            log(`GATT verbunden: "${device.name||name}"`,'target');
+
+            // MTU estimation
+            estimateMTU(server);
+
+            gattUI();renderCard(id);updatePill();
             goTab('tab-gatt');
 
             await enumerateGATT(server);
-
-        } catch (e) {
-            if (e.name === 'NotFoundError') {
-                log('Picker abgebrochen.', 'warn');
-            } else {
-                log(`Connect-Fehler: ${e.message}`, 'error');
-            }
+        } catch(e) {
+            if(e.name==='NotFoundError')log('Picker abgebrochen.','warn');
+            else log(`Connect-Fehler: ${e.message}`,'error');
         }
     }
 
     function disconnect() {
-        S.notifySubs.forEach(n => { try { n.stopNotifications(); } catch(_){} });
-        S.notifySubs = [];
-        if (S.gattServer && S.gattServer.connected) {
-            S.gattServer.disconnect();
-            log('Getrennt.');
-        }
-        const prevId = S.connId;
-        S.gattServer = null;
-        S.gattDevice = null;
-        S.connId = null;
-        updateGattUI();
-        if (prevId) renderCard(prevId);
-        updatePill();
+        S.notifySubs.forEach(ch=>{try{ch.stopNotifications()}catch(_){}});
+        S.notifySubs=[];S.wiretapActive=false;
+        if(S.gattServer&&S.gattServer.connected){S.gattServer.disconnect();log('Getrennt.')}
+        const prev=S.connId;
+        S.gattServer=null;S.gattDevice=null;S.connId=null;
+        gattUI();if(prev)renderCard(prev);updatePill();
     }
 
-    function updateGattUI() {
-        const con = S.gattServer && S.gattServer.connected;
+    function gattUI() {
+        const con = S.gattServer&&S.gattServer.connected;
         document.getElementById('btn-dc').disabled = !con;
-        document.getElementById('g-state').textContent = con ? 'Verbunden' : 'Nicht verbunden';
-        document.getElementById('g-state').className = con ? 'val on' : 'val';
-        const entry = S.connId ? S.devs.get(S.connId) : null;
-        document.getElementById('g-name').textContent = entry ? (entry.bestName || S.connId) : '—';
-        document.getElementById('g-name').className = entry?.isTarget ? 'val tgt' : 'val';
-        if (!con) {
-            document.getElementById('g-svcs').textContent = '—';
-            document.getElementById('g-notify').textContent = '—';
-            document.getElementById('gatt-list').innerHTML = '';
+        document.getElementById('btn-wt').disabled = !con;
+        document.getElementById('g-st').textContent = con?'Verbunden':'Nicht verbunden';
+        document.getElementById('g-st').className = con?'w g':'w';
+        const e = S.connId?S.devs.get(S.connId):null;
+        document.getElementById('g-nm').textContent = e?(e.bestName||S.connId):'—';
+        document.getElementById('g-nm').className = e?.isTarget?'w t':'w';
+        if(!con){
+            document.getElementById('g-sc').textContent='—';
+            document.getElementById('g-ns').textContent='—';
+            document.getElementById('g-mtu').textContent='—';
+            document.getElementById('gatt-list').innerHTML='';
+            document.getElementById('t-bat').textContent='—';
+            document.getElementById('t-bat-s').textContent='';
+            document.getElementById('t-mtu').textContent='—';
+            document.getElementById('t-mtu-s').textContent='';
         }
     }
 
-    /* ═══════════════════════════════════════════════
-       GATT ENUMERATION
-    ═══════════════════════════════════════════════ */
+    // ═══════════════════════════════════════
+    //  MTU ESTIMATION
+    // ═══════════════════════════════════════
+    async function estimateMTU(server) {
+        // Web Bluetooth hat kein direktes MTU-API.
+        // Wir schätzen anhand der größten gelesenen Characteristic.
+        S.mtuEstimate = null;
+        // Default Android: 517 (ab Android 14), vorher 23 (minimal)
+        // Wir tracken den größten Wert der gelesen wird
+        log('MTU wird über Payload-Größe geschätzt…','cyber');
+    }
+
+    function updateMTU(payloadSize) {
+        // MTU = ATT-Payload + 3 (ATT header)
+        const est = payloadSize + 3;
+        if(!S.mtuEstimate || est > S.mtuEstimate) {
+            S.mtuEstimate = est;
+            const el = document.getElementById('t-mtu');
+            const el2 = document.getElementById('g-mtu');
+            if(el){
+                el.textContent = S.mtuEstimate + ' B';
+                el.className = 'tv'+(S.mtuEstimate<=23?' crit':S.mtuEstimate<=50?' warn':'');
+            }
+            if(el2) el2.textContent = S.mtuEstimate + ' B';
+            const es = document.getElementById('t-mtu-s');
+            if(es) es.textContent = S.mtuEstimate <= 23 ? '⚠ MINIMAL — Fallback Mode!' : S.mtuEstimate <= 50 ? 'Niedrig' : 'Normal';
+        }
+    }
+
+    // ═══════════════════════════════════════
+    //  GATT ENUMERATION
+    // ═══════════════════════════════════════
     async function enumerateGATT(server) {
         const container = document.getElementById('gatt-list');
         container.innerHTML = '';
 
         let services;
-        try {
-            services = await server.getPrimaryServices();
-        } catch (e) {
-            log(`getPrimaryServices: ${e.message}`, 'error');
-            return;
-        }
+        try{services = await server.getPrimaryServices()}
+        catch(e){log(`getPrimaryServices: ${e.message}`,'error');return}
 
-        log(`${services.length} GATT-Services gefunden.`);
-        document.getElementById('g-svcs').textContent = services.length;
+        log(`${services.length} GATT-Services.`,'cyber');
+        document.getElementById('g-sc').textContent = services.length;
 
-        for (const svc of services) {
-            const svcShort = svc.uuid.substring(4, 8);
-            const svcName = SVC_NAMES[svc.uuid.substring(0,8)] || shortUUID(svc.uuid);
+        for(const svc of services) {
+            const sKey = svc.uuid.substring(0,8);
+            const sName = SVC_N[sKey] || shortU(svc.uuid);
+            const isJBLSvc = svc.uuid.includes('fe61');
 
-            const svcEl = document.createElement('div');
-            svcEl.className = 'gatt-svc';
-            svcEl.innerHTML = `<div class="gatt-svc-head">⬡ ${svcName}<small>${svc.uuid}</small></div>`;
-            container.appendChild(svcEl);
-            log(`  SVC: ${svcName}`);
+            const sEl = document.createElement('div');
+            sEl.className = 'gsvc';
+            sEl.innerHTML = `<div class="gsvc-h"${isJBLSvc?' style="color:var(--tgt)"':''}>${isJBLSvc?'◉':'⬡'} ${sName}<small>${svc.uuid}</small></div>`;
+            container.appendChild(sEl);
+            log(`  SVC: ${sName}${isJBLSvc?' [JBL PROPRIETARY]':''}`,'cyber');
 
             let chars;
-            try { chars = await svc.getCharacteristics(); }
-            catch (e) { log(`  Chars err: ${e.message}`, 'error'); continue; }
+            try{chars=await svc.getCharacteristics()}
+            catch(e){log(`  Chars err: ${e.message}`,'error');continue}
 
-            for (const ch of chars) {
-                const chShort = ch.uuid.substring(4, 8);
-                const chName = CHAR_NAMES[chShort] || chShort.toUpperCase();
-                const flags = propFlags(ch.properties);
-                const valId = `v_${ch.uuid.replace(/-/g,'')}`;
+            for(const ch of chars) {
+                const cKey = ch.uuid.substring(4,8);
+                const cName = CHR_N[cKey] || cKey.toUpperCase();
+                const flags = propF(ch.properties);
+                const vid = 'v_'+ch.uuid.replace(/-/g,'');
+                const isBatt = cKey === '2a19';
+                const isJBLChar = isJBLSvc;
 
-                let badges = '';
-                if (ch.properties.notify) badges += '<span class="badge notify">NOTIFY</span>';
-                if (ch.properties.indicate) badges += '<span class="badge indicate">IND</span>';
+                let bdg='';
+                if(ch.properties.notify)bdg+='<span class="bdg n">NOTIFY</span>';
+                if(ch.properties.indicate)bdg+='<span class="bdg i">IND</span>';
 
-                const chEl = document.createElement('div');
-                chEl.className = 'gatt-char';
-                chEl.innerHTML = `
-                    <span class="gatt-char-name">${chName}</span>${badges}
-                    <div class="gatt-char-flags">${flags}</div>
-                    <div class="gatt-char-uuid">${ch.uuid}</div>
-                    <span class="gatt-val" id="${valId}">…</span>
+                const cEl = document.createElement('div');
+                cEl.className='gch';
+                cEl.innerHTML=`
+                    <span class="gch-n"${isJBLChar?' style="color:var(--tgt)"':''}>${cName}</span>${bdg}
+                    <div class="gch-f">${flags}</div>
+                    <div class="gch-u">${ch.uuid}</div>
+                    <span class="gval" id="${vid}">…</span>
                 `;
-                svcEl.appendChild(chEl);
+                sEl.appendChild(cEl);
 
-                if (ch.properties.read) readVal(ch, valId);
-                if (ch.properties.notify || ch.properties.indicate) subscribe(ch, valId, chName);
+                // Read
+                if(ch.properties.read) {
+                    readChar(ch, vid, cName, isBatt);
+                }
+
+                // Auto-subscribe all notifiable characteristics
+                if(ch.properties.notify || ch.properties.indicate) {
+                    subChar(ch, vid, cName, svc.uuid, isBatt);
+                }
             }
         }
 
-        document.getElementById('g-notify').textContent = S.notifySubs.length;
-        log('GATT Enumeration abgeschlossen.', 'target');
+        document.getElementById('g-ns').textContent = S.notifySubs.length;
+        log(`GATT komplett. ${S.notifySubs.length} Subscriptions aktiv.`,'target');
     }
 
-    async function readVal(ch, valId) {
+    // ═══════════════════════════════════════
+    //  CHARACTERISTIC READ
+    // ═══════════════════════════════════════
+    async function readChar(ch, vid, label, isBatt) {
         try {
             const dv = await ch.readValue();
-            renderVal(dv, valId);
-            log(`    READ ${shortUUID(ch.uuid)}: ${formatDV(dv)}`);
-        } catch (e) {
-            const el = document.getElementById(valId);
-            if (el) el.textContent = `ERR: ${e.message}`;
+            const bytes = safe(dv);
+
+            // MTU tracking
+            updateMTU(bytes.length);
+
+            // Battery special handling
+            if(isBatt && bytes.length >= 1) {
+                handleBattery(bytes[0]);
+            }
+
+            // Store as previous value for delta detection
+            const h = hex(bytes);
+            S.charPrevValues.set(ch.uuid, h);
+
+            renderVal(bytes, vid);
+            log(`    READ ${label}: ${fmtBytes(bytes)}`);
+        } catch(e) {
+            const el = document.getElementById(vid);
+            if(el) el.textContent=`ERR: ${e.message}`;
         }
     }
 
-    async function subscribe(ch, valId, label) {
+    // ═══════════════════════════════════════
+    //  CHARACTERISTIC SUBSCRIBE (Wiretap)
+    // ═══════════════════════════════════════
+    async function subChar(ch, vid, label, svcUuid, isBatt) {
         try {
-            ch.addEventListener('characteristicvaluechanged', ev => {
-                renderVal(ev.target.value, valId);
-                log(`  ⚡ ${label}: ${formatDV(ev.target.value)}`, 'target');
+            ch.addEventListener('characteristicvaluechanged', ev=>{
+                const bytes = safe(ev.target.value);
+                const h = hex(bytes);
+                const prevH = S.charPrevValues.get(ch.uuid);
+                const isDelta = prevH != null && prevH !== h;
+
+                // MTU tracking
+                updateMTU(bytes.length);
+
+                // Battery
+                if(isBatt && bytes.length>=1) handleBattery(bytes[0]);
+
+                // Delta detection — render with diff highlighting
+                renderValDelta(bytes, vid, prevH);
+                S.charPrevValues.set(ch.uuid, h);
+
+                // Event stream
+                const isButtonSvc = LIKELY_BUTTON_SVCS.has(svcUuid) || BUTTON_CHARS.has(ch.uuid.substring(4,8));
+                addEvent(label, fmtBytes(bytes), isDelta, isButtonSvc);
+
+                if(isDelta) {
+                    S.deltaCount++;
+                    document.getElementById('e-dlt').textContent = S.deltaCount;
+                    log(`  ⚡ DELTA ${label}: ${fmtBytes(bytes)} (was: ${prevH})`,'target');
+                }
+                if(isButtonSvc) {
+                    S.buttonCount++;
+                    document.getElementById('e-btn').textContent = S.buttonCount;
+                    log(`  🔘 BUTTON ${label}: ${fmtBytes(bytes)}`,'target');
+                }
             });
             await ch.startNotifications();
             S.notifySubs.push(ch);
-            log(`    ✓ Sub: ${label}`, 'target');
-        } catch (e) {
-            log(`    Sub-err ${label}: ${e.message}`, 'error');
+            log(`    ✓ Sub: ${label}`,'cyber');
+        } catch(e) {
+            log(`    Sub err ${label}: ${e.message}`,'error');
         }
     }
 
-    /* ═══════════════════════════════════════════════
-       VALUE RENDERING
-    ═══════════════════════════════════════════════ */
-    function renderVal(dv, elId) {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        const bytes = safeBytes(dv);
-        const hex = bytesToHex(bytes);
-        const text = decodeText(bytes);
+    // ═══════════════════════════════════════
+    //  WIRETAP TOGGLE (re-read all)
+    // ═══════════════════════════════════════
+    async function toggleWiretap() {
+        if(!S.gattServer||!S.gattServer.connected) return;
+        S.wiretapActive = !S.wiretapActive;
+        const btn = document.getElementById('btn-wt');
+        btn.textContent = S.wiretapActive ? '⚡ Wiretap ON' : '⚡ Wiretap';
+        btn.className = S.wiretapActive ? 'btn mag' : 'btn cyan';
+        updatePill();
 
-        if (bytes.length === 0) {
-            el.textContent = '(empty)';
-        } else if (bytes.length === 1) {
-            el.textContent = `${bytes[0]}  [0x${hex}]`;
-        } else if (text && /^[\x20-\x7E]+$/.test(text)) {
-            el.textContent = `"${text}"  [${hex}]`;
+        if(S.wiretapActive) {
+            log('WIRETAP MODE AKTIV — alle Characteristics werden periodisch gepollt.','target');
+            // Also restart scan to get ADV data while connected
+            if(!S.scanning && navigator.bluetooth.requestLEScan) {
+                try {
+                    S.scan = await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true});
+                    S.scanning = true;
+                    navigator.bluetooth.addEventListener('advertisementreceived', onAdv);
+                    log('Parallel-Scan für ADV-Telemetrie gestartet.','cyber');
+                } catch(_) {}
+            }
+            // Periodic read of all readable characteristics
+            S.timers.wiretap = setInterval(wiretapPoll, 2000);
         } else {
-            el.textContent = `[${hex}]`;
+            log('Wiretap Mode deaktiviert.','warn');
+            clearInterval(S.timers.wiretap);
         }
     }
 
-    function formatDV(dv) {
-        const bytes = safeBytes(dv);
-        const hex = bytesToHex(bytes);
-        const text = decodeText(bytes);
-        if (text && /^[\x20-\x7E]+$/.test(text)) return `"${text}" [${hex}]`;
-        return `[${hex}]`;
+    async function wiretapPoll() {
+        if(!S.gattServer||!S.gattServer.connected) {
+            clearInterval(S.timers.wiretap);
+            return;
+        }
+        try {
+            const services = await S.gattServer.getPrimaryServices();
+            for(const svc of services) {
+                const chars = await svc.getCharacteristics();
+                for(const ch of chars) {
+                    if(!ch.properties.read) continue;
+                    try {
+                        const dv = await ch.readValue();
+                        const bytes = safe(dv);
+                        const h = hex(bytes);
+                        const prevH = S.charPrevValues.get(ch.uuid);
+                        const vid = 'v_'+ch.uuid.replace(/-/g,'');
+
+                        if(prevH != null && prevH !== h) {
+                            const cKey = ch.uuid.substring(4,8);
+                            const label = CHR_N[cKey]||cKey.toUpperCase();
+                            renderValDelta(bytes, vid, prevH);
+                            addEvent(label, fmtBytes(bytes), true, false);
+                            S.deltaCount++;
+                            document.getElementById('e-dlt').textContent = S.deltaCount;
+                            log(`  ⚡ POLL-DELTA ${label}: ${fmtBytes(bytes)}`,'target');
+                        } else {
+                            renderVal(bytes, vid);
+                        }
+                        S.charPrevValues.set(ch.uuid, h);
+
+                        // Battery
+                        if(ch.uuid.substring(4,8)==='2a19' && bytes.length>=1) handleBattery(bytes[0]);
+                        updateMTU(bytes.length);
+                    } catch(_) {}
+                }
+            }
+        } catch(_) {}
     }
 
-    /* ═══════════════════════════════════════════════
-       UTIL
-    ═══════════════════════════════════════════════ */
-    function safeBytes(dv) {
-        return new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
-    }
-    function bytesToHex(bytes) {
-        return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join(' ');
-    }
-    function decodeText(bytes) {
-        try { return new TextDecoder('utf-8', { fatal: false }).decode(bytes); }
-        catch(_) { return null; }
-    }
-    function shortUUID(uuid) {
-        if (!uuid) return '?';
-        if (typeof uuid === 'number') return '0x' + uuid.toString(16).toUpperCase().padStart(4,'0');
-        const s = String(uuid);
-        if (s.endsWith('-0000-1000-8000-00805f9b34fb')) return '0x' + s.substring(4,8).toUpperCase();
-        return s.substring(0,8) + '…';
-    }
-    function propFlags(p) {
-        const f = [];
-        if (p.read) f.push('R');
-        if (p.write) f.push('W');
-        if (p.writeWithoutResponse) f.push('W_NR');
-        if (p.notify) f.push('N');
-        if (p.indicate) f.push('I');
-        if (p.broadcast) f.push('BC');
-        return f.join(' · ') || '—';
+    // ═══════════════════════════════════════
+    //  BATTERY TELEMETRY
+    // ═══════════════════════════════════════
+    function handleBattery(pct) {
+        const now = Date.now();
+        S.batteryHistory.push({t:now, v:pct});
+        if(S.batteryHistory.length > 200) S.batteryHistory.splice(0,1);
+
+        const el = document.getElementById('t-bat');
+        if(el){
+            el.textContent = pct+'%';
+            el.className = 'tv'+(pct<=10?' crit':pct<=25?' warn':'');
+        }
+
+        // Detect sudden drops (>20% in 5s)
+        const es = document.getElementById('t-bat-s');
+        if(S.batteryHistory.length >= 2) {
+            const recent = S.batteryHistory.slice(-10);
+            const first = recent[0].v;
+            const last = recent[recent.length-1].v;
+            const dt = (recent[recent.length-1].t - recent[0].t)/1000;
+            if(Math.abs(first-last) > 20 && dt < 5) {
+                if(es) es.textContent = `⚠ SPIKE: ${first}%→${last}% in ${dt.toFixed(1)}s — Zelle defekt?`;
+                log(`⚠ BATTERY SPIKE: ${first}%→${last}% in ${dt.toFixed(1)}s`,'error');
+            } else {
+                if(es) es.textContent = `Stabil · ${S.batteryHistory.length} Samples`;
+            }
+        }
     }
 
-    /* ═══════════════════════════════════════════════
-       LOG EXPORT
-    ═══════════════════════════════════════════════ */
+    // ═══════════════════════════════════════
+    //  EVENT STREAM
+    // ═══════════════════════════════════════
+    function addEvent(src, val, isDelta, isButton) {
+        const ts = _ts();
+        const evt = {ts, src, val, isDelta, isButton};
+        S.events.push(evt);
+
+        const el = document.createElement('div');
+        el.className = `evt${isDelta?' delta':''}${isButton?' btn-evt':''}`;
+        el.innerHTML = `<span class="ets">${ts}</span><span class="esrc">${src}</span><span class="eval">${val}</span>`;
+        const c = document.getElementById('evt-stream');
+        c.prepend(el);
+        while(c.children.length > 500) c.removeChild(c.lastChild);
+
+        document.getElementById('e-cnt').textContent = S.events.length;
+    }
+
+    // ═══════════════════════════════════════
+    //  VALUE RENDERING
+    // ═══════════════════════════════════════
+    function renderVal(bytes, elId) {
+        const el = document.getElementById(elId);
+        if(!el) return;
+        el.innerHTML = fmtBytesHTML(bytes);
+    }
+
+    function renderValDelta(bytes, elId, prevHex) {
+        const el = document.getElementById(elId);
+        if(!el) return;
+        if(!prevHex) { el.innerHTML = fmtBytesHTML(bytes); return; }
+
+        const curHex = hex(bytes);
+        if(curHex === prevHex) { el.innerHTML = fmtBytesHTML(bytes); return; }
+
+        // Byte-level diff
+        const curParts = curHex.split(' ');
+        const prevParts = prevHex.split(' ');
+        let diffHTML = '';
+        for(let i=0; i<curParts.length; i++) {
+            if(i < prevParts.length && curParts[i] !== prevParts[i]) {
+                diffHTML += `<span class="delta">${curParts[i]}</span> `;
+            } else if(i >= prevParts.length) {
+                diffHTML += `<span class="delta">${curParts[i]}</span> `;
+            } else {
+                diffHTML += curParts[i]+' ';
+            }
+        }
+
+        const text = decTxt(bytes);
+        let display = '';
+        if(text && /^[\x20-\x7E]+$/.test(text)) {
+            display = `"${text}" [${diffHTML.trim()}]`;
+        } else if(bytes.length===1) {
+            display = `${bytes[0]} [${diffHTML.trim()}]`;
+        } else {
+            display = `[${diffHTML.trim()}]`;
+        }
+
+        el.innerHTML = `${display}<span class="prev">prev: [${prevHex}]</span>`;
+    }
+
+    function fmtBytesHTML(bytes) {
+        const h = hex(bytes);
+        const text = decTxt(bytes);
+        if(bytes.length===0) return '(empty)';
+        if(bytes.length===1) return `${bytes[0]}  [0x${h}]`;
+        if(text && /^[\x20-\x7E]+$/.test(text)) return `"${esc(text)}"  [${h}]`;
+        return `[${h}]`;
+    }
+
+    function fmtBytes(bytes) {
+        const h = hex(bytes);
+        const text = decTxt(bytes);
+        if(bytes.length===0) return '(empty)';
+        if(bytes.length===1) return `${bytes[0]} [0x${h}]`;
+        if(text && /^[\x20-\x7E]+$/.test(text)) return `"${text}" [${h}]`;
+        return `[${h}]`;
+    }
+
+    // ═══════════════════════════════════════
+    //  UTIL
+    // ═══════════════════════════════════════
+    function safe(dv){return new Uint8Array(dv.buffer,dv.byteOffset,dv.byteLength)}
+    function hex(b){return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join(' ')}
+    function decTxt(b){try{return new TextDecoder('utf-8',{fatal:false}).decode(b)}catch(_){return null}}
+    function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+    function shortU(u){
+        if(!u)return'?';if(typeof u==='number')return'0x'+u.toString(16).toUpperCase().padStart(4,'0');
+        const s=String(u);
+        if(s.endsWith('-0000-1000-8000-00805f9b34fb'))return'0x'+s.substring(4,8).toUpperCase();
+        return s.substring(0,8)+'…';
+    }
+    function propF(p){
+        const f=[];
+        if(p.read)f.push('R');if(p.write)f.push('W');if(p.writeWithoutResponse)f.push('W_NR');
+        if(p.notify)f.push('N');if(p.indicate)f.push('I');if(p.broadcast)f.push('BC');
+        return f.join(' · ')||'—';
+    }
+
+    // ═══════════════════════════════════════
+    //  EXPORT
+    // ═══════════════════════════════════════
     function exportLog() {
-        const header = `BLE YVES LOG — ${new Date().toISOString()}\nDevices seen: ${S.devs.size}\n${'═'.repeat(60)}\n\n`;
-        const devDump = [...S.devs.values()].map(d =>
-            `${d.bestName || '(no name)'} | target:${d.isTarget} | rssi:${d.rssi} | count:${d.count} | mfr:[${[...d.mfr.keys()].map(k=>'0x'+k.toString(16)).join(',')}]`
-        ).join('\n');
-        const logDump = S.logs.map(e => `[${e.ts}] [${e.type||'info'}] ${e.msg}`).join('\n');
-        const blob = new Blob([header + 'DEVICES:\n' + devDump + '\n\nLOG:\n' + logDump], { type: 'text/plain' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `BLE_YVES_${Date.now()}.txt`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const sep = '═'.repeat(70);
+        let out = `BLE DIAGNOSTIC LOG — ${new Date().toISOString()}\n${sep}\n\n`;
+
+        out += `DEVICES (${S.devs.size}):\n${'-'.repeat(50)}\n`;
+        S.devs.forEach((d,id)=>{
+            const names = d.names.size > 0 ? [...d.names].join(' / ') : '(kein Name)';
+            out += `  ${names}\n`;
+            out += `    ID:       ${id}\n`;
+            out += `    Target:   ${d.isTarget}\n`;
+            out += `    RSSI:     ${d.rssi} dBm\n`;
+            out += `    TX Power: ${d.txPower != null ? d.txPower : '—'}\n`;
+            out += `    MFR:      ${[...d.mfr.entries()].map(([k,v])=>`${v.label} (0x${k.toString(16)}) [${v.hex}]`).join(', ')||'—'}\n`;
+            out += `    Services: ${[...d.svcUuids].map(u=>shortU(u)).join(', ')||'—'}\n`;
+            out += `    ADV Int:  ${d.advIntervalMs!=null?d.advIntervalMs+'ms ±'+d.advIntervalJitter+'ms':'—'}\n`;
+            out += `    Count:    ${d.count}\n`;
+            out += `    First:    ${new Date(d.firstSeen).toISOString()}\n`;
+            out += `    Last:     ${new Date(d.lastSeen).toISOString()}\n\n`;
+        });
+
+        if(S.mtuEstimate) out += `\nMTU ESTIMATE: ${S.mtuEstimate} Bytes\n`;
+        if(S.batteryHistory.length>0) {
+            out += `\nBATTERY HISTORY (${S.batteryHistory.length} samples):\n`;
+            S.batteryHistory.forEach(b=>{
+                out += `  ${new Date(b.t).toISOString()} → ${b.v}%\n`;
+            });
+        }
+
+        out += `\n${sep}\nLOG (${S.logs.length}):\n${'-'.repeat(50)}\n`;
+        S.logs.forEach(e=>{out+=`[${e.ts}] [${e.type||'info'}] ${e.msg}\n`});
+
+        dl(out, `BLE_DIAG_${Date.now()}.txt`);
         log('Log exportiert.');
     }
 
-    function clearLog() {
-        S.logs = [];
-        document.getElementById('log-list').innerHTML = '';
+    function exportEvents() {
+        let out = `BLE EVENT STREAM — ${new Date().toISOString()}\n`;
+        out += `Total: ${S.events.length} | Deltas: ${S.deltaCount} | Button: ${S.buttonCount}\n`;
+        out += '═'.repeat(70)+'\n\n';
+        S.events.forEach(e=>{
+            out += `[${e.ts}] ${e.isDelta?'DELTA ':''}${e.isButton?'BTN ':''}${e.src}: ${e.val}\n`;
+        });
+        dl(out, `BLE_EVENTS_${Date.now()}.txt`);
+        log('Events exportiert.');
     }
 
-    /* ═══════════════════════════════════════════════
-       PUBLIC
-    ═══════════════════════════════════════════════ */
-    return { startScan, stopScan, connectDevice, disconnect, tab, exportLog, clearLog };
+    function dl(text, fname) {
+        const b = new Blob([text],{type:'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = fname;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function clearLog(){S.logs=[];document.getElementById('log-list').innerHTML=''}
+
+    // ═══════════════════════════════════════
+    //  PUBLIC
+    // ═══════════════════════════════════════
+    return {startScan,stopScan,connectDevice,disconnect,toggleWiretap,tab,exportLog,exportEvents,clearLog};
 })();
 </script>
 </body>
