@@ -2,133 +2,214 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>BLE DEEP MINER</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BLE BLACKBOX RECORDER</title>
     <style>
-        body { font-family: monospace; background: #000; color: #0f0; padding: 10px; }
-        button { width: 48%; padding: 15px; font-weight:bold; font-size: 1rem; background: #222; color: #fff; border: 1px solid #555; }
-        button.active { background: #0f0; color: #000; }
+        body { background-color: #000; color: #0f0; font-family: 'Courier New', monospace; margin: 0; padding: 10px; overflow: hidden; }
+        
+        /* Kontrollzentrum - Muss groß sein für Staplerfahrer */
+        #controls { position: fixed; top: 0; left: 0; right: 0; background: #111; padding: 10px; border-bottom: 2px solid #0f0; z-index: 100; }
+        button { width: 48%; height: 50px; font-weight:bold; font-size: 1rem; border: 1px solid #0f0; background: #000; color: #0f0; }
         button.stop { border-color: #f00; color: #f00; }
-        textarea { width: 100%; height: 300px; background: #111; color: #ccc; border: 1px solid #333; margin-top: 10px; font-size: 10px; }
-        .stats { font-size: 12px; color: #888; margin: 5px 0; }
+        button.download { background: #004400; color: #fff; width: 100%; margin-top: 5px; }
+
+        /* Statusanzeige */
+        #stats { margin-top: 110px; font-size: 0.9rem; color: #aaa; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        .stat-box { display: inline-block; width: 48%; }
+        .highlight { color: #fff; font-weight: bold; }
+
+        /* Der Live-Log */
+        #logWindow { 
+            height: calc(100vh - 160px); 
+            overflow-y: scroll; 
+            font-size: 0.75rem; 
+            margin-top: 10px;
+            white-space: pre-wrap; /* Wichtig für Hex-Umbruch */
+        }
+        .entry { border-bottom: 1px solid #222; padding: 4px 0; }
+        .rssi-bad { color: #555; }
+        .rssi-good { color: #0f0; }
+        .rssi-hot { color: #ff00ff; font-weight: bold; } /* Wenn du direkt davor stehst */
     </style>
 </head>
 <body>
 
-    <div style="display:flex; justify-content:space-between;">
-        <button id="btnStart" onclick="startScan()">START SCAN</button>
-        <button class="stop" onclick="stopScan()">STOP</button>
+    <div id="controls">
+        <div style="display:flex; justify-content:space-between;">
+            <button id="btnStart" onclick="startScan()">REC START</button>
+            <button class="stop" onclick="stopScan()">STOP</button>
+        </div>
+        <button class="download" onclick="downloadCSV()">CSV EXPORTIEREN (EXCEL)</button>
     </div>
 
-    <div class="stats" id="status">Bereit.</div>
-    
-    <textarea id="logArea" readonly placeholder="Daten erscheinen hier..."></textarea>
-    
-    <button onclick="copyLog()" style="width:100%; margin-top:5px;">ALLES KOPIEREN</button>
-    <button onclick="clearLog()" style="width:100%; margin-top:5px; background:#400;">LÖSCHEN</button>
+    <div id="stats">
+        <div class="stat-box">Pakete: <span id="pkgCount" class="highlight">0</span></div>
+        <div class="stat-box">Geräte: <span id="devCount" class="highlight">0</span></div>
+        <div id="statusMsg">Warte auf Start...</div>
+    </div>
+
+    <div id="logWindow"></div>
 
     <script>
         let scanResult;
+        let isScanning = false;
         
-        // Filter-Listen (ignoriere Consumer-Schrott)
-        const IGNORE_CIDS = ["004c", "0075", "0006", "0003"]; // Apple, Samsung, Microsoft, Logitech
-        const IGNORE_NAMES = ["MEGABOOM", "Headset", "Phone", "TV"];
+        // Der Hauptspeicher - Hier landen ALLE Daten
+        let database = []; // Array von Objekten
+        let uniqueDevices = new Set();
+        let packageCounter = 0;
 
-        function appendLog(text) {
-            const ta = document.getElementById('logArea');
-            ta.value = text + "\n" + ta.value; // Neuestes oben
+        // Hilfsfunktion: Bytes zu Hex-String
+        function buf2hex(buffer) {
+            return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('').toUpperCase();
+        }
+
+        function updateStats() {
+            document.getElementById('pkgCount').innerText = packageCounter;
+            document.getElementById('devCount').innerText = uniqueDevices.size;
+        }
+
+        function logToScreen(mac, rssi, name, hexData) {
+            const logWin = document.getElementById('logWindow');
+            
+            // Performance-Schutz: Zeige nur die letzten 50 Einträge im Browser an,
+            // aber speichere ALLES im Hintergrund.
+            if (logWin.children.length > 50) {
+                logWin.lastElementChild.remove();
+            }
+
+            // Farbcodierung nach Signalstärke
+            let colorClass = 'rssi-bad';
+            if (rssi > -80) colorClass = 'rssi-good';
+            if (rssi > -60) colorClass = 'rssi-hot';
+
+            const div = document.createElement('div');
+            div.className = 'entry';
+            div.innerHTML = `
+                <span class="${colorClass}">[${rssi}]</span> ${mac} | ${name} <br>
+                <span style="color:#666; font-size:0.7em">${hexData}</span>
+            `;
+            logWin.prepend(div);
         }
 
         async function startScan() {
+            if (isScanning) return;
+            
+            // Reset bei Neustart? Nein, wir hängen an (Continuous Logging).
+            // Falls Reset gewünscht: database = []; packageCounter = 0;
+            
             try {
-                document.getElementById('btnStart').classList.add('active');
-                
                 scanResult = await navigator.bluetooth.requestLEScan({
                     acceptAllAdvertisements: true,
-                    keepRepeatedDevices: true
+                    keepRepeatedDevices: true // WICHTIG: Sonst gibt's nur 1 Paket pro MAC
                 });
 
-                document.getElementById('status').innerText = "SCAN LÄUFT... Apple/Samsung/Audio gefiltert.";
+                isScanning = true;
+                document.getElementById('statusMsg').innerText = "AUFNAHME LÄUFT - NICHT SCHLIESSEN!";
+                document.getElementById('btnStart').style.background = "#0f0";
+                document.getElementById('btnStart').style.color = "#000";
 
                 navigator.bluetooth.addEventListener('advertisementreceived', event => {
-                    processPacket(event);
+                    packageCounter++;
+                    
+                    const mac = event.device.id;
+                    const rssi = event.rssi;
+                    const name = event.device.name || "N/A";
+                    const timestamp = new Date().toISOString();
+                    
+                    uniqueDevices.add(mac);
+
+                    // --- DATEN EXTRAKTION ---
+                    let rawPayload = "";
+                    let parsedData = ""; // Für CSV: CID/UUID getrennt
+
+                    // 1. Manufacturer Data
+                    event.manufacturerData.forEach((value, key) => {
+                        const hexVal = buf2hex(value.buffer);
+                        const cid = key.toString(16).padStart(4, '0').toUpperCase();
+                        rawPayload += `[M:${cid}=${hexVal}] `;
+                        parsedData += `MAN_ID:${cid}|DATA:${hexVal};`;
+                    });
+
+                    // 2. Service Data (Wichtig für FTS!)
+                    if (event.serviceData) {
+                        event.serviceData.forEach((value, key) => {
+                            const hexVal = buf2hex(value.buffer);
+                            rawPayload += `[S:${key}=${hexVal}] `;
+                            parsedData += `SVC_UUID:${key}|DATA:${hexVal};`;
+                        });
+                    }
+
+                    // 3. UUIDs (Liste der Services)
+                    let uuidStr = "";
+                    if (event.uuids) {
+                        uuidStr = event.uuids.join(',');
+                        rawPayload += `[U:${uuidStr}]`;
+                    }
+
+                    // --- SPEICHERN ---
+                    // Wir speichern ein strukturiertes Objekt für den CSV Export
+                    database.push({
+                        time: timestamp,
+                        rssi: rssi,
+                        mac: mac, // Browser ID
+                        name: name,
+                        uuids: uuidStr,
+                        raw_combined: parsedData || "EMPTY_PAYLOAD",
+                        txPower: event.txPower || ""
+                    });
+
+                    // --- UI UPDATE (Throttled für Performance) ---
+                    if (packageCounter % 5 === 0) { // Nur jedes 5. Paket rendern um CPU zu sparen
+                        updateStats();
+                        // Nur anzeigen wenn Payload da ist oder RSSI stark ist
+                        if (rawPayload.length > 5 || rssi > -70) {
+                            logToScreen(mac, rssi, name, rawPayload);
+                        }
+                    }
                 });
 
             } catch (error) {
-                alert("Fehler: " + error);
-                document.getElementById('btnStart').classList.remove('active');
+                alert("Fehler: " + error + "\nBluetooth aktiv? Flags an?");
             }
-        }
-
-        function processPacket(event) {
-            const rssi = event.rssi;
-            const name = event.device.name || "N/A";
-            const macID = event.device.id; // Browser ID
-
-            // 1. Daten extrahieren (Manufacturer Data)
-            let manHex = "";
-            let cidFound = "";
-            event.manufacturerData.forEach((value, key) => {
-                let cid = key.toString(16).padStart(4, '0');
-                cidFound = cid;
-                let data = "";
-                for (let i = 0; i < value.byteLength; i++) {
-                    data += value.getUint8(i).toString(16).padStart(2, '0');
-                }
-                manHex += `[CID:${cid}] ${data} `;
-            });
-
-            // 2. Daten extrahieren (Service Data) - DAS IST NEU
-            let svcHex = "";
-            if (event.serviceData) {
-                event.serviceData.forEach((value, key) => {
-                    let data = "";
-                    for (let i = 0; i < value.byteLength; i++) {
-                        data += value.getUint8(i).toString(16).padStart(2, '0');
-                    }
-                    svcHex += `[SVC:${key}] ${data} `;
-                });
-            }
-
-            // 3. UUIDs
-            let uuids = event.uuids ? event.uuids.join(", ") : "";
-
-            // 4. FILTERUNG (Müll rauswerfen)
-            if (IGNORE_CIDS.includes(cidFound)) return;
-            if (IGNORE_NAMES.some(n => name.includes(n))) return;
-
-            // 5. Output Formatieren (Nur wenn Payload existiert oder RSSI stark ist)
-            // Wir wollen "Geister" sehen (starkes Signal, aber keine Daten)
-            if (manHex === "" && svcHex === "" && rssi < -80) return; // Schwache Geister ignorieren
-
-            const timestamp = new Date().toLocaleTimeString();
-            let entry = `[${timestamp}] RSSI:${rssi} | Name:${name}`;
-            
-            if (manHex) entry += `\n  MAN: ${manHex}`;
-            if (svcHex) entry += `\n  SVC: ${svcHex}`; // Hier könnten die FTS Daten stecken!
-            if (uuids)  entry += `\n  UUID: ${uuids}`;
-            if (!manHex && !svcHex) entry += `\n  [KEINE PAYLOAD DATEN]`;
-            
-            entry += "\n--------------------------------";
-            
-            appendLog(entry);
         }
 
         function stopScan() {
-            if (scanResult) scanResult.stop();
-            document.getElementById('status').innerText = "GESTOPPT.";
-            document.getElementById('btnStart').classList.remove('active');
+            if (scanResult) {
+                scanResult.stop();
+                isScanning = false;
+                document.getElementById('statusMsg').innerText = "GESTOPPT. CSV DOWNLOADEN!";
+                document.getElementById('btnStart').style.background = "#000";
+                document.getElementById('btnStart').style.color = "#0f0";
+            }
         }
 
-        function copyLog() {
-            const ta = document.getElementById('logArea');
-            ta.select();
-            document.execCommand('copy'); // Fallback für ältere Webviews
-            navigator.clipboard.writeText(ta.value).then(() => alert("Kopiert!"));
-        }
-        
-        function clearLog() {
-             document.getElementById('logArea').value = "";
+        function downloadCSV() {
+            if (database.length === 0) {
+                alert("Keine Daten aufgenommen!");
+                return;
+            }
+
+            // CSV Header
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Timestamp,RSSI,MAC_ID,Name,UUIDs,Payload_Hex,TxPower\n";
+
+            // Daten Zeile für Zeile
+            database.forEach(row => {
+                let cleanPayload = row.raw_combined.replace(/,/g, ";"); // Kommas im Payload killen CSV Struktur
+                let rowStr = `${row.time},${row.rssi},${row.mac},"${row.name}","${row.uuids}",${cleanPayload},${row.txPower}`;
+                csvContent += rowStr + "\n";
+            });
+
+            // Download Trigger
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            const filename = "FTS_SCAN_" + new Date().toISOString().slice(0,19).replace(/:/g,"-") + ".csv";
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     </script>
 </body>
