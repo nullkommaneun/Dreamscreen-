@@ -12,7 +12,7 @@
             --c-surface:  #131920;
             --c-border:   #1e2a3a;
             --c-neon:     #00ff9f;
-            --c-target:   #ff00ff; /* Yves Pink */
+            --c-target:   #ff00ff;
             --c-blue:     #38bdf8;
             --c-amber:    #fbbf24;
             --c-red:      #f43f5e;
@@ -34,68 +34,90 @@
         .status-pill[data-state="connected"] { color: var(--c-neon); border-color: var(--c-neon); }
         .status-pill[data-state="target-found"] { color: var(--c-target); border-color: var(--c-target); animation: pulse 1s infinite; }
 
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 
         /* Content */
-        #content { flex-grow: 1; position: relative; overflow-y: auto; padding: 16px; }
+        #content { flex-grow: 1; position: relative; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* Target Highlighting */
+        /* Device Cards */
         #device-container { display: flex; flex-direction: column; }
-        .device-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; cursor: pointer; position: relative; }
-        
-        /* Yves-Spezifischer Fokus */
-        .device-card.target-lock { 
-            order: -1; /* Schiebt Yves immer nach oben */
-            border: 2px solid var(--c-target); 
+        .device-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; cursor: pointer; position: relative; transition: border-color 0.3s; }
+        .device-card:active { opacity: 0.8; }
+
+        .device-card.target-lock {
+            order: -1;
+            border: 2px solid var(--c-target);
             background: rgba(255, 0, 255, 0.05);
             box-shadow: 0 0 15px rgba(255, 0, 255, 0.2);
         }
         .device-card.target-lock::before { content: "TARGET DETECTED"; position: absolute; top: -10px; left: 10px; background: var(--c-target); color: #fff; font-size: 8px; padding: 2px 6px; font-family: var(--font-mono); font-weight: 800; border-radius: 4px; }
 
         .dev-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .dev-name { font-family: var(--font-mono); font-weight: 600; color: #fff; }
-        .dev-rssi { font-family: var(--font-mono); font-weight: 800; }
+        .dev-name { font-family: var(--font-mono); font-weight: 600; color: #fff; font-size: 13px; }
+        .dev-meta { font-size: 9px; color: #5a6e82; font-family: var(--font-mono); line-height: 1.6; }
 
         /* Buttons */
-        .action-btn { width: 100%; padding: 14px; border: 1px solid var(--c-neon); border-radius: var(--radius); background: rgba(0,255,159,0.05); color: var(--c-neon); font-family: var(--font-mono); text-transform: uppercase; cursor: pointer; margin-bottom: 16px; }
+        .action-btn { width: 100%; padding: 14px; border: 1px solid var(--c-neon); border-radius: var(--radius); background: rgba(0,255,159,0.05); color: var(--c-neon); font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; cursor: pointer; margin-bottom: 10px; -webkit-tap-highlight-color: transparent; }
+        .action-btn:active { background: rgba(0,255,159,0.15); }
         .action-btn.blue { border-color: var(--c-blue); color: var(--c-blue); background: rgba(56,189,248,0.05); }
+        .action-btn.blue:active { background: rgba(56,189,248,0.15); }
+        .action-btn.target { border-color: var(--c-target); color: var(--c-target); background: rgba(255,0,255,0.05); }
+        .action-btn:disabled { opacity: 0.3; pointer-events: none; }
+        .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .btn-row .action-btn { margin-bottom: 0; font-size: 10px; padding: 10px 6px; }
 
         /* GATT List */
-        .gatt-service { border: 1px solid var(--c-border); border-radius: var(--radius); margin-bottom: 10px; background: #000; }
-        .svc-header { padding: 8px 12px; font-size: 11px; color: var(--c-blue); background: #1a2230; font-family: var(--font-mono); }
-        .char-node { padding: 8px 12px; border-top: 1px solid var(--c-border); font-size: 11px; }
-        .val-display { display: block; background: #000; padding: 4px; color: var(--c-neon); margin-top: 4px; border-radius: 4px; overflow-wrap: anywhere; }
+        .gatt-service { border: 1px solid var(--c-border); border-radius: var(--radius); margin-bottom: 10px; background: #000; overflow: hidden; }
+        .svc-header { padding: 8px 12px; font-size: 11px; color: var(--c-blue); background: #1a2230; font-family: var(--font-mono); word-break: break-all; }
+        .char-node { padding: 8px 12px; border-top: 1px solid var(--c-border); font-size: 11px; font-family: var(--font-mono); }
+        .char-props { font-size: 9px; color: var(--c-amber); margin-top: 2px; }
+        .val-display { display: block; background: #0a0e14; padding: 6px; color: var(--c-neon); margin-top: 4px; border-radius: 4px; overflow-wrap: anywhere; font-size: 10px; line-height: 1.5; }
+        .notify-badge { display: inline-block; font-size: 8px; background: var(--c-target); color: #fff; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
 
         /* Bottom Nav */
         #navbar { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--c-surface); border-top: 1px solid var(--c-border); padding-bottom: env(safe-area-inset-bottom); }
-        .nav-btn { padding: 12px; border: none; background: transparent; color: #5a6e82; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+        .nav-btn { padding: 12px; border: none; background: transparent; color: #5a6e82; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; -webkit-tap-highlight-color: transparent; }
         .nav-btn.active { color: var(--c-neon); border-top: 2px solid var(--c-neon); }
 
-        .log-entry { font-family: var(--font-mono); font-size: 10px; border-bottom: 1px solid #1e2a3a; padding: 4px 0; }
+        .log-entry { font-family: var(--font-mono); font-size: 10px; border-bottom: 1px solid #1e2a3a; padding: 4px 0; line-height: 1.5; }
         .log-target { color: var(--c-target); font-weight: bold; }
+        .log-error { color: var(--c-red); }
+
+        .info-box { font-family: var(--font-mono); font-size: 10px; color: #5a6e82; padding: 10px; border: 1px dashed var(--c-border); border-radius: var(--radius); margin-bottom: 12px; line-height: 1.6; }
     </style>
 </head>
 <body>
 
 <div id="app">
     <div id="topbar">
-        <h1>BLE CMD // YVES-SNIFFER</h1>
+        <h1>BLE // YVES</h1>
         <div class="status-pill" id="status-pill" data-state="idle">IDLE</div>
     </div>
 
     <div id="content">
+        <!-- TAB: SCAN -->
         <div class="tab-panel active" id="tab-scan">
-            <button class="action-btn" onclick="App.scan()">Start Radar Scan</button>
+            <div class="info-box">
+                Chrome Web Bluetooth: Jeder Scan öffnet den System-Picker.<br>
+                Wähle dein JBL Gerät aus der Liste.
+            </div>
+            <button class="action-btn" id="btn-scan-all" onclick="App.scanAll()">Scan — Alle Geräte</button>
+            <button class="action-btn target" id="btn-scan-jbl" onclick="App.scanJBL()">Scan — Nur JBL Filter</button>
             <div id="device-container"></div>
         </div>
 
+        <!-- TAB: GATT -->
         <div class="tab-panel" id="tab-gatt">
-            <button class="action-btn blue" onclick="App.connect()">Target Connect</button>
+            <div class="btn-row">
+                <button class="action-btn blue" id="btn-connect" onclick="App.connectSelected()">Connect</button>
+                <button class="action-btn" id="btn-disconnect" onclick="App.disconnect()" disabled>Disconnect</button>
+            </div>
             <div id="gatt-container"></div>
         </div>
 
+        <!-- TAB: LOG -->
         <div class="tab-panel" id="tab-log">
             <button class="action-btn" onclick="App.exportLog()">Export Log</button>
             <div id="log-container"></div>
@@ -111,28 +133,62 @@
 
 <script>
 const App = (() => {
+    // ── State ──
     const state = {
-        devices: new Map(),
-        connectedDevice: null,
-        logEntries: [],
-        targetsFound: 0
+        devices: new Map(),       // id → { device, name, isTarget }
+        selectedDevice: null,     // BluetoothDevice
+        gattServer: null,         // BluetoothRemoteGATTServer
+        activeNotifies: [],       // cleanup refs
+        logEntries: []
     };
 
-    const KNOWN = {
-        manufacturers: { 0x0057: 'JBL/HARMAN', 0x0003: 'JBL-CRASH (IBM-ID)' },
-        chars: { '00002a25': 'Serial Number', '00002a29': 'Manufacturer', '00002a00': 'Device Name' }
+    // ── Known UUIDs ──
+    // Standard BLE services wir mitlesen wollen
+    const OPTIONAL_SERVICES = [
+        'generic_access',              // 0x1800
+        'generic_attribute',           // 0x1801
+        'device_information',          // 0x180A
+        'battery_service',             // 0x180F
+        0xFE61,                        // JBL custom service (Harman)
+        0xFEA0,                        // Google / oft bei BLE audio
+    ];
+
+    const KNOWN_SERVICE_NAMES = {
+        '00001800-0000-1000-8000-00805f9b34fb': 'Generic Access',
+        '00001801-0000-1000-8000-00805f9b34fb': 'Generic Attribute',
+        '0000180a-0000-1000-8000-00805f9b34fb': 'Device Information',
+        '0000180f-0000-1000-8000-00805f9b34fb': 'Battery Service',
+        '0000fe61-0000-1000-8000-00805f9b34fb': 'JBL Custom (FE61)',
+        '0000fea0-0000-1000-8000-00805f9b34fb': 'Google Fast Pair',
     };
 
-    function log(msg, isTarget = false) {
-        const ts = new Date().toLocaleTimeString();
-        state.logEntries.push({ ts, msg, isTarget });
+    const KNOWN_CHAR_NAMES = {
+        '2a00': 'Device Name',
+        '2a01': 'Appearance',
+        '2a04': 'Peripheral Preferred Connection Parameters',
+        '2a05': 'Service Changed',
+        '2a19': 'Battery Level',
+        '2a23': 'System ID',
+        '2a24': 'Model Number',
+        '2a25': 'Serial Number',
+        '2a26': 'Firmware Revision',
+        '2a27': 'Hardware Revision',
+        '2a28': 'Software Revision',
+        '2a29': 'Manufacturer Name',
+        '2a50': 'PnP ID',
+    };
+
+    // ── Logging ──
+    function log(msg, type = 'info') {
+        const ts = new Date().toLocaleTimeString('de-DE');
+        state.logEntries.push({ ts, msg, type });
         const el = document.createElement('div');
-        el.className = `log-entry ${isTarget ? 'log-target' : ''}`;
+        el.className = `log-entry ${type === 'target' ? 'log-target' : type === 'error' ? 'log-error' : ''}`;
         el.textContent = `[${ts}] ${msg}`;
-        const container = document.getElementById('log-container');
-        container.prepend(el);
+        document.getElementById('log-container').prepend(el);
     }
 
+    // ── Tab Switching ──
     function switchTab(btn) {
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -140,116 +196,353 @@ const App = (() => {
         btn.classList.add('active');
     }
 
-    async function scan() {
-        if (!navigator.bluetooth) return alert("Web Bluetooth nicht unterstützt.");
-        
+    // ── Detect if device is our target ──
+    function isTargetDevice(device) {
+        const name = (device.name || '').toLowerCase();
+        return name.includes('yves') || name.includes('jbl');
+    }
+
+    // ── SCAN: All devices (acceptAllDevices) ──
+    async function scanAll() {
+        if (!navigator.bluetooth) {
+            alert('Web Bluetooth nicht verfügbar.\nChrome + HTTPS oder chrome://flags benötigt.');
+            return;
+        }
         try {
-            log("Suche nach Geräten...");
+            log('Scan gestartet — alle Geräte (System-Picker öffnet sich)');
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: ['device_information', 0xFE61]
+                optionalServices: OPTIONAL_SERVICES
             });
-            addDevice(device, -50);
-        } catch (e) { log("Scan Fehler: " + e.message); }
-    }
-
-    function addDevice(device, rssi, mfrData = []) {
-        const id = device.id;
-        const name = device.name || "Unbekannt";
-        const isYves = name.toLowerCase().includes('yves') || mfrData.includes(3);
-
-        if (isYves) {
-            log(`ZIEL ERKANNT: ${name}`, true);
-            document.getElementById('status-pill').dataset.state = "target-found";
+            handleFoundDevice(device);
+        } catch (e) {
+            if (e.name === 'NotFoundError') {
+                log('Kein Gerät ausgewählt.', 'info');
+            } else {
+                log(`Scan Fehler: ${e.message}`, 'error');
+            }
         }
-
-        state.devices.set(id, { device, name, rssi, isYves });
-        renderCard(id);
     }
 
-    function renderCard(id) {
-        const info = state.devices.get(id);
-        let card = document.querySelector(`[data-id="${id}"]`);
-        
-        if (!card) {
-            card = document.createElement('div');
-            card.dataset.id = id;
-            card.onclick = () => connectTo(info.device);
-            document.getElementById('device-container').appendChild(card);
+    // ── SCAN: JBL-Filter (namePrefix + fallback) ──
+    async function scanJBL() {
+        if (!navigator.bluetooth) {
+            alert('Web Bluetooth nicht verfügbar.');
+            return;
         }
-
-        card.className = `device-card ${info.isYves ? 'target-lock' : ''}`;
-        card.innerHTML = `
-            <div class="dev-header">
-                <span class="dev-name">${info.name}</span>
-                <span class="dev-rssi">${info.rssi} dBm</span>
-            </div>
-            <div style="font-size:9px; color:#5a6e82; font-family:var(--font-mono)">ID: ${id.substring(0,15)}</div>
-        `;
-    }
-
-    async function connect() {
         try {
+            log('Scan gestartet — JBL Filter (namePrefix)');
             const device = await navigator.bluetooth.requestDevice({
                 filters: [
                     { namePrefix: 'JBL' },
-                    { manufacturerData: [{ companyIdentifier: 0x0057 }] },
-                    { manufacturerData: [{ companyIdentifier: 0x0003 }] }
+                    { namePrefix: 'Yves' },
+                    { namePrefix: 'YVES' },
+                    { namePrefix: 'yves' },
                 ],
-                optionalServices: ['device_information', 0xFE61]
+                optionalServices: OPTIONAL_SERVICES
             });
-            await connectTo(device);
-        } catch (e) { log("Connect Fehler: " + e.message); }
+            handleFoundDevice(device);
+        } catch (e) {
+            if (e.name === 'NotFoundError') {
+                log('Kein JBL Gerät gefunden / ausgewählt.', 'info');
+            } else {
+                log(`JBL Scan Fehler: ${e.message}`, 'error');
+            }
+        }
     }
 
-    async function connectTo(device) {
-        log(`Verbinde zu ${device.name}...`);
+    // ── Handle found device from picker ──
+    function handleFoundDevice(device) {
+        const name = device.name || 'Unbekannt';
+        const id = device.id;
+        const target = isTargetDevice(device);
+
+        log(`Gerät gefunden: "${name}" (${id.substring(0, 12)}…)`, target ? 'target' : 'info');
+
+        if (target) {
+            const pill = document.getElementById('status-pill');
+            pill.textContent = 'TARGET';
+            pill.dataset.state = 'target-found';
+        }
+
+        // Disconnection-Listener
+        device.addEventListener('gattserverdisconnected', () => {
+            log(`"${name}" getrennt.`, 'error');
+            if (state.gattServer === device.gatt) {
+                state.gattServer = null;
+                updateConnectionUI(false);
+            }
+        });
+
+        state.devices.set(id, { device, name, isTarget: target });
+        state.selectedDevice = device;
+        renderDeviceCard(id);
+    }
+
+    // ── Render device card ──
+    function renderDeviceCard(id) {
+        const info = state.devices.get(id);
+        let card = document.querySelector(`[data-dev-id="${id}"]`);
+
+        if (!card) {
+            card = document.createElement('div');
+            card.dataset.devId = id;
+            document.getElementById('device-container').appendChild(card);
+        }
+
+        card.className = `device-card ${info.isTarget ? 'target-lock' : ''}`;
+        card.innerHTML = `
+            <div class="dev-header">
+                <span class="dev-name">${info.name}</span>
+            </div>
+            <div class="dev-meta">
+                ID: ${id.substring(0, 18)}<br>
+                ${info.isTarget ? '★ TARGET — Tap Connect im GATT Tab' : 'Tap um auszuwählen'}
+            </div>
+        `;
+        card.onclick = () => {
+            state.selectedDevice = info.device;
+            log(`"${info.name}" als Ziel ausgewählt.`, info.isTarget ? 'target' : 'info');
+            // Visuell markieren
+            document.querySelectorAll('.device-card').forEach(c => c.style.outline = 'none');
+            card.style.outline = `2px solid ${info.isTarget ? 'var(--c-target)' : 'var(--c-neon)'}`;
+        };
+    }
+
+    // ── Connect to selected device ──
+    async function connectSelected() {
+        if (!state.selectedDevice) {
+            log('Kein Gerät ausgewählt. Zuerst scannen!', 'error');
+            return;
+        }
+
+        const device = state.selectedDevice;
+        const name = device.name || 'Unbekannt';
+
+        if (!device.gatt) {
+            log('GATT nicht verfügbar auf diesem Gerät.', 'error');
+            return;
+        }
+
+        log(`Verbinde zu "${name}"…`);
+        document.getElementById('btn-connect').disabled = true;
+
         try {
             const server = await device.gatt.connect();
-            log("GATT verbunden!", true);
-            document.getElementById('status-pill').textContent = "CONNECTED";
-            document.getElementById('status-pill').dataset.state = "connected";
-            
-            const services = await server.getPrimaryServices();
-            const container = document.getElementById('gatt-container');
-            container.innerHTML = '';
+            state.gattServer = server;
+            log(`GATT verbunden mit "${name}"!`, 'target');
+            updateConnectionUI(true);
 
-            for (const svc of services) {
-                const sEl = document.createElement('div');
-                sEl.className = 'gatt-service';
-                sEl.innerHTML = `<div class="svc-header">SERVICE: ${svc.uuid}</div>`;
-                container.appendChild(sEl);
+            await enumerateGATT(server);
+        } catch (e) {
+            log(`Connect Fehler: ${e.message}`, 'error');
+            document.getElementById('btn-connect').disabled = false;
+        }
+    }
 
-                const chars = await svc.getCharacteristics();
-                for (const char of chars) {
-                    const cEl = document.createElement('div');
-                    cEl.className = 'char-node';
-                    const name = KNOWN.chars[char.uuid.substring(4,8)] || char.uuid.substring(4,8);
-                    cEl.innerHTML = `CHAR: ${name} <span class="val-display" id="val-${char.uuid}">Lese...</span>`;
-                    sEl.appendChild(cEl);
+    // ── Disconnect ──
+    function disconnect() {
+        if (state.gattServer && state.gattServer.connected) {
+            // Cleanup notifications
+            state.activeNotifies.forEach(n => {
+                try { n.char.stopNotifications(); } catch (_) {}
+            });
+            state.activeNotifies = [];
+            state.gattServer.disconnect();
+            log('Manuell getrennt.');
+        }
+        state.gattServer = null;
+        updateConnectionUI(false);
+    }
 
-                    if (char.properties.read) {
-                        try {
-                            const val = await char.readValue();
-                            const decoded = new TextDecoder().decode(val);
-                            const hex = Array.from(new Uint8Array(val.buffer)).map(b => b.toString(16).padStart(2,'0')).join(' ');
-                            document.getElementById(`val-${char.uuid}`).textContent = `"${decoded}" [HEX: ${hex}]`;
-                        } catch (err) { document.getElementById(`val-${char.uuid}`).textContent = "N/A"; }
-                    }
+    function updateConnectionUI(connected) {
+        const pill = document.getElementById('status-pill');
+        document.getElementById('btn-connect').disabled = connected;
+        document.getElementById('btn-disconnect').disabled = !connected;
+
+        if (connected) {
+            pill.textContent = 'CONNECTED';
+            pill.dataset.state = 'connected';
+        } else {
+            pill.textContent = 'IDLE';
+            pill.dataset.state = 'idle';
+            document.getElementById('btn-connect').disabled = false;
+        }
+    }
+
+    // ── Enumerate all GATT services & characteristics ──
+    async function enumerateGATT(server) {
+        const container = document.getElementById('gatt-container');
+        container.innerHTML = '';
+
+        let services;
+        try {
+            services = await server.getPrimaryServices();
+            log(`${services.length} Service(s) gefunden.`);
+        } catch (e) {
+            log(`getPrimaryServices Fehler: ${e.message}`, 'error');
+            return;
+        }
+
+        for (const svc of services) {
+            const svcUUID = svc.uuid;
+            const svcName = KNOWN_SERVICE_NAMES[svcUUID] || shortUUID(svcUUID);
+
+            const sEl = document.createElement('div');
+            sEl.className = 'gatt-service';
+            sEl.innerHTML = `<div class="svc-header">⬡ ${svcName}<br><span style="color:#5a6e82;font-size:9px">${svcUUID}</span></div>`;
+            container.appendChild(sEl);
+
+            log(`Service: ${svcName}`);
+
+            let chars;
+            try {
+                chars = await svc.getCharacteristics();
+            } catch (e) {
+                log(`  Chars Fehler für ${svcName}: ${e.message}`, 'error');
+                continue;
+            }
+
+            for (const char of chars) {
+                const charShort = char.uuid.substring(4, 8);
+                const charName = KNOWN_CHAR_NAMES[charShort] || charShort.toUpperCase();
+                const props = describeProperties(char.properties);
+
+                const cEl = document.createElement('div');
+                cEl.className = 'char-node';
+
+                const valId = `val-${char.uuid.replace(/-/g, '')}`;
+                let badges = '';
+                if (char.properties.notify) badges += '<span class="notify-badge">NOTIFY</span>';
+                if (char.properties.indicate) badges += '<span class="notify-badge">INDICATE</span>';
+
+                cEl.innerHTML = `
+                    <strong>${charName}</strong> ${badges}
+                    <div class="char-props">${props}</div>
+                    <div class="char-props" style="color:#5a6e82">${char.uuid}</div>
+                    <span class="val-display" id="${valId}">…</span>
+                `;
+                sEl.appendChild(cEl);
+
+                // Read value if readable
+                if (char.properties.read) {
+                    readCharValue(char, valId);
+                }
+
+                // Subscribe to notifications if supported
+                if (char.properties.notify || char.properties.indicate) {
+                    subscribeNotify(char, valId, charName);
                 }
             }
-        } catch (e) { log("GATT Error: " + e.message); }
+        }
+
+        log('GATT Enumeration abgeschlossen.', 'target');
     }
 
+    // ── Read a characteristic value ──
+    async function readCharValue(char, valId) {
+        try {
+            const val = await char.readValue();
+            displayValue(val, valId);
+            const decoded = tryDecode(val);
+            log(`  READ ${shortUUID(char.uuid)}: ${decoded}`);
+        } catch (e) {
+            const el = document.getElementById(valId);
+            if (el) el.textContent = `READ ERROR: ${e.message}`;
+        }
+    }
+
+    // ── Subscribe to notifications ──
+    async function subscribeNotify(char, valId, charName) {
+        try {
+            char.addEventListener('characteristicvaluechanged', (event) => {
+                const val = event.target.value;
+                displayValue(val, valId);
+                const decoded = tryDecode(val);
+                log(`  NOTIFY ${charName}: ${decoded}`, 'target');
+            });
+            await char.startNotifications();
+            state.activeNotifies.push({ char });
+            log(`  ✓ Subscribed: ${charName}`, 'target');
+        } catch (e) {
+            log(`  Notify-Fehler ${charName}: ${e.message}`, 'error');
+        }
+    }
+
+    // ── Display DataView in element ──
+    function displayValue(dataView, elId) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+
+        // Sicherer Buffer-Zugriff: DataView.buffer kann einen Offset haben
+        const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        const text = tryDecodeBytes(bytes);
+
+        if (bytes.length === 1) {
+            // Einzel-Byte (z.B. Battery Level)
+            el.textContent = `${bytes[0]} (0x${hex})`;
+        } else if (text && isPrintable(text)) {
+            el.textContent = `"${text}"  [${hex}]`;
+        } else {
+            el.textContent = `[${hex}]`;
+        }
+    }
+
+    // ── Helpers ──
+    function tryDecode(dataView) {
+        const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+        return tryDecodeBytes(bytes);
+    }
+
+    function tryDecodeBytes(bytes) {
+        try {
+            return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function isPrintable(str) {
+        return str && /^[\x20-\x7E\xA0-\xFF]+$/.test(str);
+    }
+
+    function shortUUID(uuid) {
+        // Zeige 16-bit Teil bei Standard UUIDs
+        if (uuid.endsWith('-0000-1000-8000-00805f9b34fb')) {
+            return '0x' + uuid.substring(4, 8).toUpperCase();
+        }
+        return uuid.substring(0, 13) + '…';
+    }
+
+    function describeProperties(props) {
+        const flags = [];
+        if (props.read) flags.push('READ');
+        if (props.write) flags.push('WRITE');
+        if (props.writeWithoutResponse) flags.push('WRITE_NR');
+        if (props.notify) flags.push('NOTIFY');
+        if (props.indicate) flags.push('INDICATE');
+        if (props.broadcast) flags.push('BROADCAST');
+        if (props.authenticatedSignedWrites) flags.push('SIGNED_WRITE');
+        return flags.join(' | ') || 'NONE';
+    }
+
+    // ── Export Log ──
     function exportLog() {
-        const blob = new Blob([JSON.stringify(state.logEntries)], {type: 'application/json'});
+        const text = state.logEntries
+            .map(e => `[${e.ts}] [${e.type}] ${e.msg}`)
+            .join('\n');
+        const blob = new Blob([text], { type: 'text/plain' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `YVES_DUMP_${Date.now()}.json`;
+        a.download = `YVES_LOG_${Date.now()}.txt`;
         a.click();
+        URL.revokeObjectURL(a.href);
+        log('Log exportiert.');
     }
 
-    return { scan, connect, switchTab, exportLog };
+    // ── Public API ──
+    return { scanAll, scanJBL, connectSelected, disconnect, switchTab, exportLog };
 })();
 </script>
 </body>
