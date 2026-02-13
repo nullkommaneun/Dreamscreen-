@@ -2,223 +2,1295 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BLE DIAGNOSTIC TOOL V2.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0e14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BLE CMD CENTER</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #121212; --text: #00ff41; --warn: #ffcc00; --err: #ff3333; --panel: #1e1e1e; }
-        body { background-color: var(--bg); color: var(--text); font-family: 'Consolas', 'Monaco', monospace; margin: 0; padding: 0; overflow: hidden; font-size: 12px; }
-        
-        /* HEADER / CONTROLS */
-        #hud { position: fixed; top: 0; left: 0; right: 0; height: 140px; background: var(--panel); border-bottom: 2px solid var(--text); z-index: 100; padding: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        
-        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        button { flex: 1; height: 45px; background: #000; border: 1px solid var(--text); color: var(--text); font-weight: bold; font-family: inherit; cursor: pointer; text-transform: uppercase; }
-        button:active { background: var(--text); color: #000; }
-        button#btnStop { border-color: var(--err); color: var(--err); }
-        button#btnExport { border-color: var(--warn); color: var(--warn); }
+        /* ═══════════════════════════════════════════════════
+           DESIGN SYSTEM — Industrial Terminal Aesthetic
+           ═══════════════════════════════════════════════════ */
+        :root {
+            --c-bg:       #0a0e14;
+            --c-surface:  #131920;
+            --c-surface2: #1a2230;
+            --c-border:   #1e2a3a;
+            --c-neon:     #00ff9f;
+            --c-neon-dim: #00cc7f;
+            --c-neon-bg:  rgba(0,255,159,0.06);
+            --c-blue:     #38bdf8;
+            --c-amber:    #fbbf24;
+            --c-red:      #f43f5e;
+            --c-text:     #c8d6e5;
+            --c-text-dim: #5a6e82;
+            --c-white:    #e8edf2;
+            --font-mono:  'JetBrains Mono', 'Consolas', monospace;
+            --font-ui:    'IBM Plex Sans', 'Segoe UI', sans-serif;
+            --radius:     8px;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
 
-        /* METRICS */
-        #metrics { display: flex; justify-content: space-between; font-size: 14px; border-top: 1px solid #333; padding-top: 5px; }
-        .metric { text-align: center; }
-        .val { font-size: 18px; font-weight: bold; display: block; }
-        
-        /* LOGGING AREA */
-        #terminal { position: fixed; top: 150px; bottom: 0; left: 0; right: 0; padding: 10px; overflow-y: auto; background: #000; }
-        .log-entry { border-bottom: 1px solid #333; padding: 4px 0; word-break: break-all; }
-        .meta { color: #666; font-size: 10px; display: inline-block; width: 130px; }
-        .rssi { font-weight: bold; width: 40px; display: inline-block; text-align: right; margin-right: 10px; }
-        .rssi.weak { color: #555; }
-        .rssi.med { color: var(--warn); }
-        .rssi.strong { color: var(--text); }
-        
-        /* HIGHLIGHTS */
-        .target-harman { color: #ff00ff; border: 1px solid #ff00ff; background: #220022; }
-        .target-apple { color: #555; opacity: 0.7; } /* Noise reduction visual */
-        
-        .payload { display: block; color: #888; font-size: 10px; margin-left: 140px; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%; overflow: hidden;
+            background: var(--c-bg); color: var(--c-text);
+            font-family: var(--font-ui); font-size: 14px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        /* ═══ APP SHELL ═══ */
+        #app {
+            display: flex; flex-direction: column;
+            height: 100%; height: 100dvh;
+        }
+
+        /* ─── Top Bar ─── */
+        #topbar {
+            flex-shrink: 0;
+            padding: 12px 16px 8px;
+            background: var(--c-surface);
+            border-bottom: 1px solid var(--c-border);
+            display: flex; align-items: center; gap: 12px;
+        }
+
+        #topbar h1 {
+            font-family: var(--font-mono); font-size: 13px;
+            font-weight: 800; letter-spacing: 2px;
+            color: var(--c-neon); flex-grow: 1;
+            text-shadow: 0 0 20px rgba(0,255,159,0.3);
+        }
+
+        .status-pill {
+            font-family: var(--font-mono); font-size: 10px;
+            font-weight: 600; letter-spacing: 1px;
+            padding: 4px 10px; border-radius: 20px;
+            background: var(--c-surface2);
+            border: 1px solid var(--c-border);
+            color: var(--c-text-dim);
+            transition: all 0.3s;
+        }
+        .status-pill[data-state="scanning"] { color: var(--c-amber); border-color: var(--c-amber); background: rgba(251,191,36,0.08); }
+        .status-pill[data-state="connected"] { color: var(--c-neon); border-color: var(--c-neon); background: var(--c-neon-bg); }
+        .status-pill[data-state="error"]     { color: var(--c-red); border-color: var(--c-red); background: rgba(244,63,94,0.08); }
+
+        /* ─── Content Area ─── */
+        #content {
+            flex-grow: 1; overflow: hidden;
+            position: relative;
+        }
+
+        .tab-panel {
+            position: absolute; inset: 0;
+            overflow-y: auto; overflow-x: hidden;
+            padding: 16px;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+            -webkit-overflow-scrolling: touch;
+        }
+        .tab-panel.active { opacity: 1; pointer-events: auto; }
+
+        /* ─── Bottom Nav ─── */
+        #navbar {
+            flex-shrink: 0;
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            background: var(--c-surface);
+            border-top: 1px solid var(--c-border);
+            padding-bottom: var(--safe-bottom);
+        }
+
+        .nav-btn {
+            border: none; background: transparent; color: var(--c-text-dim);
+            font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+            letter-spacing: 0.5px; text-transform: uppercase;
+            padding: 12px 4px 10px; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            transition: color 0.2s;
+            position: relative;
+        }
+        .nav-btn svg { width: 22px; height: 22px; stroke-width: 1.8; }
+        .nav-btn.active { color: var(--c-neon); }
+        .nav-btn.active::before {
+            content: ''; position: absolute; top: 0; left: 20%; right: 20%;
+            height: 2px; background: var(--c-neon);
+            box-shadow: 0 0 8px var(--c-neon);
+        }
+        .nav-btn .badge {
+            position: absolute; top: 6px; right: calc(50% - 18px);
+            min-width: 16px; height: 16px; border-radius: 8px;
+            background: var(--c-neon); color: var(--c-bg);
+            font-size: 9px; font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 4px;
+        }
+
+        /* ═══ COMPONENTS ═══ */
+
+        /* Action Button (primary) */
+        .action-btn {
+            width: 100%; padding: 16px;
+            border: 2px solid var(--c-neon); border-radius: var(--radius);
+            background: var(--c-neon-bg); color: var(--c-neon);
+            font-family: var(--font-mono); font-size: 14px;
+            font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+            cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .action-btn:active { background: var(--c-neon); color: var(--c-bg); transform: scale(0.97); }
+        .action-btn:disabled { opacity: 0.3; pointer-events: none; }
+        .action-btn.blue { border-color: var(--c-blue); color: var(--c-blue); background: rgba(56,189,248,0.06); }
+        .action-btn.blue:active { background: var(--c-blue); color: var(--c-bg); }
+        .action-btn.red { border-color: var(--c-red); color: var(--c-red); background: rgba(244,63,94,0.06); }
+        .action-btn.red:active { background: var(--c-red); color: #fff; }
+
+        .btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+        .btn-row .action-btn { flex: 1; }
+
+        /* Device Card */
+        .device-card {
+            background: var(--c-surface);
+            border: 1px solid var(--c-border);
+            border-radius: var(--radius);
+            padding: 14px; margin-bottom: 10px;
+            transition: border-color 0.3s, background 0.3s;
+            cursor: pointer;
+        }
+        .device-card:active { background: var(--c-surface2); }
+        .device-card.highlight {
+            border-color: var(--c-neon);
+            background: var(--c-neon-bg);
+        }
+
+        .device-card .dev-header {
+            display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;
+        }
+        .device-card .dev-name {
+            font-family: var(--font-mono); font-weight: 600;
+            color: var(--c-white); font-size: 13px;
+            word-break: break-all;
+        }
+        .device-card .dev-rssi {
+            font-family: var(--font-mono); font-weight: 800;
+            font-size: 13px; flex-shrink: 0; margin-left: 8px;
+        }
+        .rssi-strong { color: var(--c-neon); }
+        .rssi-medium { color: var(--c-amber); }
+        .rssi-weak   { color: var(--c-red); }
+
+        .device-card .dev-meta {
+            font-family: var(--font-mono); font-size: 11px;
+            color: var(--c-text-dim); line-height: 1.6;
+        }
+        .device-card .dev-tags {
+            display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;
+        }
+        .tag {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+            letter-spacing: 0.5px; text-transform: uppercase;
+            padding: 2px 8px; border-radius: 4px;
+        }
+        .tag-service  { background: rgba(56,189,248,0.15); color: var(--c-blue); }
+        .tag-mfr      { background: rgba(251,191,36,0.15); color: var(--c-amber); }
+        .tag-corona    { background: rgba(244,63,94,0.15); color: var(--c-red); }
+        .tag-findmy    { background: rgba(0,255,159,0.15); color: var(--c-neon); }
+
+        /* GATT Explorer */
+        .gatt-service {
+            margin-bottom: 16px;
+            border: 1px solid var(--c-border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .gatt-service-header {
+            background: var(--c-surface2);
+            padding: 10px 14px;
+            font-family: var(--font-mono); font-size: 12px;
+            font-weight: 600; color: var(--c-blue);
+            display: flex; align-items: center; gap: 8px;
+            cursor: pointer;
+        }
+        .gatt-service-header .svc-label {
+            color: var(--c-text-dim); font-weight: 400; font-size: 11px;
+        }
+
+        .gatt-char {
+            padding: 10px 14px;
+            border-top: 1px solid var(--c-border);
+            font-family: var(--font-mono); font-size: 11px;
+        }
+        .gatt-char .char-uuid { color: var(--c-text-dim); margin-bottom: 4px; word-break: break-all; }
+        .gatt-char .char-props {
+            display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px;
+        }
+        .gatt-char .char-props .tag { font-size: 8px; }
+        .tag-read   { background: rgba(0,255,159,0.12); color: var(--c-neon); }
+        .tag-write  { background: rgba(251,191,36,0.12); color: var(--c-amber); }
+        .tag-notify { background: rgba(56,189,248,0.12); color: var(--c-blue); }
+
+        .char-value {
+            background: var(--c-bg);
+            border-radius: 4px;
+            padding: 8px 10px;
+            font-size: 11px; line-height: 1.5;
+            color: var(--c-neon);
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+        .char-value .val-label { color: var(--c-text-dim); }
+
+        .char-actions { display: flex; gap: 6px; margin-top: 6px; }
+        .char-action-btn {
+            font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+            letter-spacing: 0.5px; text-transform: uppercase;
+            padding: 4px 10px; border-radius: 4px;
+            border: 1px solid var(--c-border); background: var(--c-surface2);
+            color: var(--c-text); cursor: pointer;
+        }
+        .char-action-btn:active { background: var(--c-neon); color: var(--c-bg); border-color: var(--c-neon); }
+        .char-action-btn.subscribed { background: var(--c-blue); color: var(--c-bg); border-color: var(--c-blue); }
+
+        /* Log */
+        .log-entry {
+            font-family: var(--font-mono); font-size: 11px;
+            padding: 6px 0; border-bottom: 1px solid rgba(30,42,58,0.5);
+            line-height: 1.5; display: flex; gap: 8px;
+        }
+        .log-entry .log-time { color: var(--c-text-dim); flex-shrink: 0; }
+        .log-entry .log-msg  { word-break: break-all; }
+        .log-entry.log-info  .log-msg { color: var(--c-text); }
+        .log-entry.log-ok    .log-msg { color: var(--c-neon); }
+        .log-entry.log-warn  .log-msg { color: var(--c-amber); }
+        .log-entry.log-error .log-msg { color: var(--c-red); }
+        .log-entry.log-data  .log-msg { color: var(--c-blue); }
+
+        /* Settings */
+        .settings-group {
+            background: var(--c-surface);
+            border: 1px solid var(--c-border);
+            border-radius: var(--radius);
+            padding: 14px; margin-bottom: 12px;
+        }
+        .settings-group h3 {
+            font-family: var(--font-mono); font-size: 11px;
+            font-weight: 600; letter-spacing: 1px;
+            color: var(--c-text-dim); text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        .setting-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; font-size: 13px;
+        }
+        .setting-row + .setting-row { border-top: 1px solid var(--c-border); }
+
+        /* Toggle Switch */
+        .toggle {
+            width: 44px; height: 24px; border-radius: 12px;
+            background: var(--c-surface2); border: 1px solid var(--c-border);
+            position: relative; cursor: pointer; transition: all 0.2s;
+        }
+        .toggle::after {
+            content: ''; position: absolute;
+            top: 2px; left: 2px; width: 18px; height: 18px;
+            border-radius: 50%; background: var(--c-text-dim);
+            transition: all 0.2s;
+        }
+        .toggle.on { background: var(--c-neon-bg); border-color: var(--c-neon); }
+        .toggle.on::after { left: 22px; background: var(--c-neon); }
+
+        /* Section headers */
+        .section-title {
+            font-family: var(--font-mono); font-size: 11px;
+            font-weight: 600; letter-spacing: 1.5px;
+            color: var(--c-text-dim); text-transform: uppercase;
+            margin-bottom: 12px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .section-title::after {
+            content: ''; flex-grow: 1; height: 1px;
+            background: var(--c-border);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center; padding: 40px 20px;
+            color: var(--c-text-dim);
+        }
+        .empty-state svg { width: 48px; height: 48px; opacity: 0.3; margin-bottom: 12px; }
+        .empty-state p { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; }
+
+        /* Pulse animation for scanning */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,159,0.2); }
+            50% { box-shadow: 0 0 0 8px rgba(0,255,159,0); }
+        }
+        .scanning-active { animation: pulse-glow 2s infinite; }
+
+        /* ═══ RESPONSIVE — Tablet+ ═══ */
+        @media (min-width: 768px) {
+            #content { display: flex; }
+            .tab-panel {
+                position: static; flex: 1;
+                opacity: 1; pointer-events: auto;
+                border-right: 1px solid var(--c-border);
+            }
+            .tab-panel:last-of-type { border-right: none; }
+            /* Show Scanner + Explorer side by side */
+            #tab-scan, #tab-gatt { display: block; }
+            #tab-log, #tab-settings { display: none; }
+            .tab-panel.active-desktop { display: block; }
+            #navbar { grid-template-columns: repeat(4, 1fr); }
+        }
     </style>
 </head>
 <body>
 
-    <div id="hud">
-        <div class="btn-group">
-            <button id="btnScan" onclick="toggleScan()">SCAN START</button>
-            <button id="btnStop" onclick="stopScan()" disabled>STOP</button>
-        </div>
-        <button id="btnExport" onclick="exportCSV()" style="width:100%; height:30px;">DUMP DOWNLOAD (CSV)</button>
-        
-        <div id="metrics">
-            <div class="metric"><span class="val" id="cnt-pkg">0</span>PKTS</div>
-            <div class="metric"><span class="val" id="cnt-dev">0</span>DEVS</div>
-            <div class="metric"><span class="val" id="cnt-target">0</span>SUSPECTS</div>
-        </div>
-        <div id="status" style="margin-top:5px; text-align:center; color:#fff;">READY</div>
+<div id="app">
+    <!-- ─── Top Bar ─── -->
+    <div id="topbar">
+        <h1>BLE CMD</h1>
+        <div class="status-pill" id="status-pill" data-state="idle">IDLE</div>
     </div>
 
-    <div id="terminal">
+    <!-- ─── Content ─── -->
+    <div id="content">
+        <!-- TAB: Scanner -->
+        <div class="tab-panel active" id="tab-scan">
+            <div class="btn-row">
+                <button class="action-btn" id="btn-scan" onclick="App.scan()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                    Scan
+                </button>
+            </div>
+
+            <div class="section-title">Geräte in Reichweite</div>
+            <div id="device-container">
+                <div class="empty-state" id="scan-empty">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-5 0V4.5A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 16a2.5 2.5 0 0 1 5 0v3.5a2.5 2.5 0 0 1-5 0V16z"/></svg>
+                    <p>Noch keine Geräte entdeckt.<br>Starte einen Scan um BLE-Geräte zu finden.</p>
+                </div>
+            </div>
         </div>
 
-    <script>
-        // CORE VARIABLES
-        let scanHandle = null;
-        let db = []; // The raw database
-        let devicesFound = new Set();
-        let suspectCount = 0;
-        let isScanning = false;
+        <!-- TAB: GATT Explorer -->
+        <div class="tab-panel" id="tab-gatt">
+            <div class="btn-row">
+                <button class="action-btn blue" id="btn-connect" onclick="App.connect()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M6.5 17.5l11-11M12 2v20"/></svg>
+                    Verbinden
+                </button>
+                <button class="action-btn red" id="btn-disconnect" onclick="App.disconnect()" disabled>
+                    Trennen
+                </button>
+            </div>
 
-        // UI REFERENCES
-        const uiLog = document.getElementById('terminal');
-        const uiPkg = document.getElementById('cnt-pkg');
-        const uiDev = document.getElementById('cnt-dev');
-        const uiSus = document.getElementById('cnt-target');
-        const uiStatus = document.getElementById('status');
+            <div class="section-title">GATT Services</div>
+            <div id="gatt-container">
+                <div class="empty-state" id="gatt-empty">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                    <p>Kein Gerät verbunden.<br>Wähle „Verbinden" um GATT Services zu erkunden.</p>
+                </div>
+            </div>
+        </div>
 
-        // UTILS
-        const buf2hex = buffer => Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('').toUpperCase();
+        <!-- TAB: Log -->
+        <div class="tab-panel" id="tab-log">
+            <div class="btn-row">
+                <button class="action-btn" onclick="App.exportLog('json')">JSON Export</button>
+                <button class="action-btn blue" onclick="App.exportLog('txt')">Text Export</button>
+            </div>
+            <div class="btn-row">
+                <button class="action-btn red" onclick="App.clearLog()">Log Löschen</button>
+            </div>
+            <div class="section-title">System Log</div>
+            <div id="log-container"></div>
+        </div>
 
-        async function toggleScan() {
-            if (isScanning) return;
-            
+        <!-- TAB: Settings -->
+        <div class="tab-panel" id="tab-settings">
+            <div class="section-title">Scan Konfiguration</div>
+            <div class="settings-group">
+                <h3>Filter</h3>
+                <div class="setting-row">
+                    <span>Corona ENF (0xFD6F) hervorheben</span>
+                    <div class="toggle on" data-setting="highlightCorona" onclick="App.toggleSetting(this)"></div>
+                </div>
+                <div class="setting-row">
+                    <span>Apple FindMy (0x004C) hervorheben</span>
+                    <div class="toggle on" data-setting="highlightFindMy" onclick="App.toggleSetting(this)"></div>
+                </div>
+                <div class="setting-row">
+                    <span>Vibration bei Fund</span>
+                    <div class="toggle" data-setting="vibrateOnFind" onclick="App.toggleSetting(this)"></div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Verbindung</h3>
+                <div class="setting-row">
+                    <span>Auto-Reconnect</span>
+                    <div class="toggle on" data-setting="autoReconnect" onclick="App.toggleSetting(this)"></div>
+                </div>
+                <div class="setting-row">
+                    <span>Alle Services anfragen</span>
+                    <div class="toggle on" data-setting="requestAllServices" onclick="App.toggleSetting(this)"></div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Optionale Service UUIDs</h3>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--c-text-dim); line-height: 1.8;">
+                    device_information, battery_service,<br>
+                    0xFE61 (JBL), 0xFEBE (Bose),<br>
+                    0xFD6F (Corona ENF)
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>System</h3>
+                <div class="setting-row">
+                    <span>Session-Daten löschen</span>
+                    <button class="char-action-btn" onclick="App.clearSession()">RESET</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Bottom Navigation ─── -->
+    <div id="navbar">
+        <button class="nav-btn active" data-tab="tab-scan" onclick="App.switchTab(this)">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            <span>Scan</span>
+            <span class="badge" id="badge-devices" style="display:none">0</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-gatt" onclick="App.switchTab(this)">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6.5 6.5l11 11M6.5 17.5l11-11M12 2v20"/></svg>
+            <span>GATT</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-log" onclick="App.switchTab(this)">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            <span>Log</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-settings" onclick="App.switchTab(this)">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span>Config</span>
+        </button>
+    </div>
+</div>
+
+<script>
+/* ═════════════════════════════════════════════════════════════════
+   BLE COMMAND CENTER — Core Application Logic
+   Vanilla ES2020+ — No frameworks, no dependencies
+   ═════════════════════════════════════════════════════════════════ */
+
+const App = (() => {
+    'use strict';
+
+    // ─── Well-known BLE identifiers ───
+    const KNOWN = {
+        services: {
+            '0000fd6f-0000-1000-8000-00805f9b34fb': { name: 'Corona ENF', tag: 'corona' },
+            '0000fe61-0000-1000-8000-00805f9b34fb': { name: 'JBL Specific', tag: 'mfr' },
+            '0000febe-0000-1000-8000-00805f9b34fb': { name: 'Bose Specific', tag: 'mfr' },
+            '0000180a-0000-1000-8000-00805f9b34fb': { name: 'Device Information', tag: 'service' },
+            '0000180f-0000-1000-8000-00805f9b34fb': { name: 'Battery Service', tag: 'service' },
+            '00001800-0000-1000-8000-00805f9b34fb': { name: 'Generic Access', tag: 'service' },
+            '00001801-0000-1000-8000-00805f9b34fb': { name: 'Generic Attribute', tag: 'service' },
+        },
+        manufacturers: {
+            0x004C: 'Apple',
+            0x0006: 'Microsoft',
+            0x000D: 'Texas Instruments',
+            0x004C: 'Apple (FindMy)',
+            0x0057: 'Harman',
+            0x0003: 'Unknown (0x0003)',
+            0x0059: 'Nordic Semiconductor',
+            0x02E5: 'Espressif',
+        },
+        characteristics: {
+            '00002a29-0000-1000-8000-00805f9b34fb': 'Manufacturer Name',
+            '00002a24-0000-1000-8000-00805f9b34fb': 'Model Number',
+            '00002a25-0000-1000-8000-00805f9b34fb': 'Serial Number',
+            '00002a26-0000-1000-8000-00805f9b34fb': 'Firmware Rev',
+            '00002a27-0000-1000-8000-00805f9b34fb': 'Hardware Rev',
+            '00002a28-0000-1000-8000-00805f9b34fb': 'Software Rev',
+            '00002a19-0000-1000-8000-00805f9b34fb': 'Battery Level',
+            '00002a00-0000-1000-8000-00805f9b34fb': 'Device Name',
+            '00002a01-0000-1000-8000-00805f9b34fb': 'Appearance',
+        }
+    };
+
+    // ─── State ───
+    const state = {
+        devices: new Map(),        // id → { device, name, rssi, mfrData, serviceUUIDs, lastSeen, count }
+        connectedDevice: null,
+        gattServer: null,
+        subscriptions: new Map(),  // char.uuid → characteristic (for unsubscribe)
+        logEntries: [],
+        settings: {
+            highlightCorona: true,
+            highlightFindMy: true,
+            vibrateOnFind: false,
+            autoReconnect: true,
+            requestAllServices: true,
+        }
+    };
+
+    // ─── Load persisted settings ───
+    try {
+        const saved = sessionStorage.getItem('ble-cmd-settings');
+        if (saved) Object.assign(state.settings, JSON.parse(saved));
+    } catch (_) {}
+
+    // ═══════════════════════════════════════
+    //  LOGGING
+    // ═══════════════════════════════════════
+    function log(msg, level = 'info') {
+        const now = new Date();
+        const ts = now.toLocaleTimeString('de-DE', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        const entry = { ts, msg, level, timestamp: now.toISOString() };
+        state.logEntries.push(entry);
+
+        const el = document.createElement('div');
+        el.className = `log-entry log-${level}`;
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'log-time';
+        timeSpan.textContent = ts;
+
+        const msgSpan = document.createElement('span');
+        msgSpan.className = 'log-msg';
+        msgSpan.textContent = msg;
+
+        el.appendChild(timeSpan);
+        el.appendChild(msgSpan);
+
+        const container = document.getElementById('log-container');
+        container.appendChild(el);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // ═══════════════════════════════════════
+    //  STATUS
+    // ═══════════════════════════════════════
+    function setStatus(text, statusState = 'idle') {
+        const pill = document.getElementById('status-pill');
+        pill.textContent = text.toUpperCase();
+        pill.dataset.state = statusState;
+    }
+
+    // ═══════════════════════════════════════
+    //  TAB NAVIGATION
+    // ═══════════════════════════════════════
+    function switchTab(btn) {
+        const tabId = btn.dataset.tab;
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    // ═══════════════════════════════════════
+    //  SAFE DATAVIEW READ (Buffer fix!)
+    // ═══════════════════════════════════════
+    /**
+     * Chrome/Android sometimes returns DataView where buffer.byteLength > 0
+     * but byteOffset is non-zero. Creating a new Uint8Array with
+     * (buffer, offset, length) is the safe way; raw new Uint8Array(buffer) crashes.
+     */
+    function safeBytes(dataView) {
+        if (!dataView || !dataView.buffer) return new Uint8Array(0);
+        try {
+            return new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+        } catch {
+            // Fallback: copy byte-by-byte
+            const arr = new Uint8Array(dataView.byteLength);
+            for (let i = 0; i < dataView.byteLength; i++) {
+                arr[i] = dataView.getUint8(i);
+            }
+            return arr;
+        }
+    }
+
+    function bytesToHex(bytes) {
+        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    }
+
+    function bytesToText(bytes) {
+        try {
+            const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+            // Check if it's printable
+            if (/^[\x20-\x7E\xA0-\xFF]+$/.test(text)) return text;
+            return null;
+        } catch { return null; }
+    }
+
+    function rssiClass(rssi) {
+        if (rssi == null) return 'rssi-weak';
+        if (rssi > -50) return 'rssi-strong';
+        if (rssi > -75) return 'rssi-medium';
+        return 'rssi-weak';
+    }
+
+    // ═══════════════════════════════════════
+    //  PASSIVE SCAN (via requestDevice poll)
+    // ═══════════════════════════════════════
+    /**
+     * requestLEScan() is experimental and broken on most Android devices.
+     * Instead we use requestDevice() which opens the native BLE picker.
+     * Each device selected gets added to our radar.
+     * For true passive scanning, we fall back to requestLEScan if available.
+     */
+    async function scan() {
+        log('Scan gestartet — BLE Geräte-Picker wird geöffnet...', 'info');
+        setStatus('Scanning', 'scanning');
+
+        // Try experimental passive scan first
+        if ('requestLEScan' in navigator.bluetooth) {
             try {
-                uiStatus.innerText = "REQUESTING RADIO...";
-                // Request Bluetooth Scan with ALL advertisements enabled
-                const scan = await navigator.bluetooth.requestLEScan({
-                    acceptAllAdvertisements: true,
-                    keepRepeatedDevices: true
-                });
-
-                scanHandle = scan;
-                isScanning = true;
-                
-                document.getElementById('btnScan').disabled = true;
-                document.getElementById('btnStop').disabled = false;
-                uiStatus.innerText = "SCANNING... (WALK AROUND)";
-                uiStatus.style.color = "#0f0";
-
-                navigator.bluetooth.addEventListener('advertisementreceived', handlePacket);
-
-            } catch (err) {
-                uiStatus.innerText = "ERR: " + err.message;
-                uiStatus.style.color = "red";
-                alert("Scan failed. Ensure 'Experimental Web Platform features' is enabled in chrome://flags");
+                await startPassiveScan();
+                return;
+            } catch (e) {
+                log(`Passive Scan nicht verfügbar: ${e.message}. Fallback auf Device-Picker.`, 'warn');
             }
         }
 
-        function stopScan() {
-            if (scanHandle) {
-                scanHandle.stop();
-                isScanning = false;
-                document.getElementById('btnScan').disabled = false;
-                document.getElementById('btnStop').disabled = true;
-                uiStatus.innerText = "HALTED. DOWNLOAD DATA NOW.";
-                uiStatus.style.color = "yellow";
-            }
-        }
-
-        function handlePacket(event) {
-            // 1. EXTRACT DATA
-            const ts = new Date().toISOString();
-            const rssi = event.rssi;
-            const mac = event.device.id; // Browser obfuscated ID
-            const name = event.device.name || "N/A";
-            const txPower = event.txPower || -127;
-            
-            // Parse Manufacturer Data
-            let manId = "N/A";
-            let manDataHex = "";
-            let fullPayload = "";
-
-            event.manufacturerData.forEach((value, key) => {
-                manId = key.toString(16).padStart(4, '0').toUpperCase(); // e.g., 004C
-                manDataHex = buf2hex(value.buffer);
-                fullPayload += `MID:${manId}|D:${manDataHex}; `;
+        // Fallback: requestDevice (always works)
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: getOptionalServices()
             });
 
-            // Parse Service Data
-            event.serviceData.forEach((value, key) => {
-                fullPayload += `SVC:${key}|D:${buf2hex(value.buffer)}; `;
-            });
-            
-            // UUIDs
-            const uuids = event.uuids ? event.uuids.join(',') : "";
+            addDeviceToRadar(device, null);
+            log(`Gerät gefunden: ${device.name || 'Unbekannt'} [${device.id.substring(0, 12)}...]`, 'ok');
 
-            // 2. DETECT SUSPECTS (Logic from Python analysis)
-            let isSuspect = false;
-            let isApple = (manId === "004C");
-            
-            // Known Harman/JBL ID is 0057, previous scan showed 0003 (IBM) with 57 signature
-            if (manId === "0003" || manId === "0057" || fullPayload.includes("0457")) {
-                isSuspect = true;
-                suspectCount++;
+            if (state.settings.vibrateOnFind && navigator.vibrate) {
+                navigator.vibrate(100);
             }
 
-            // 3. STORE TO DB
-            db.push({
-                ts, rssi, mac, name, manId, fullPayload, uuids, txPower
+            setStatus('Idle', 'idle');
+        } catch (e) {
+            if (e.name === 'NotFoundError') {
+                log('Scan abgebrochen — kein Gerät ausgewählt.', 'warn');
+            } else {
+                log(`Scan-Fehler: ${e.message}`, 'error');
+            }
+            setStatus('Idle', 'idle');
+        }
+    }
+
+    async function startPassiveScan() {
+        const scan = await navigator.bluetooth.requestLEScan({
+            acceptAllAdvertisements: true,
+            keepRepeatedDevices: true
+        });
+
+        log('Passive Scan aktiv — lausche auf Advertisements...', 'ok');
+
+        const handler = (event) => {
+            const mfrIds = [];
+            if (event.manufacturerData) {
+                event.manufacturerData.forEach((value, key) => mfrIds.push(key));
+            }
+            const svcUUIDs = event.uuids || [];
+
+            addDeviceToRadar(event.device, event.rssi, mfrIds, svcUUIDs);
+        };
+
+        navigator.bluetooth.addEventListener('advertisementreceived', handler);
+
+        // Auto-stop after 60 seconds to save battery
+        setTimeout(() => {
+            scan.stop();
+            navigator.bluetooth.removeEventListener('advertisementreceived', handler);
+            log('Passive Scan nach 60s gestoppt.', 'warn');
+            setStatus('Idle', 'idle');
+        }, 60000);
+    }
+
+    function getOptionalServices() {
+        const base = ['device_information', 'battery_service'];
+        if (state.settings.requestAllServices) {
+            base.push(0xFE61, 0xFEBE, 0xFD6F);
+        }
+        return base;
+    }
+
+    // ═══════════════════════════════════════
+    //  DEVICE RADAR
+    // ═══════════════════════════════════════
+    function addDeviceToRadar(device, rssi, mfrIds = [], svcUUIDs = []) {
+        const id = device.id;
+        const existing = state.devices.get(id);
+
+        const info = {
+            device,
+            name: device.name || existing?.name || 'Unbekannt',
+            rssi: rssi ?? existing?.rssi ?? null,
+            mfrIds: mfrIds.length ? mfrIds : (existing?.mfrIds || []),
+            svcUUIDs: svcUUIDs.length ? svcUUIDs : (existing?.svcUUIDs || []),
+            lastSeen: Date.now(),
+            count: (existing?.count || 0) + 1,
+        };
+
+        state.devices.set(id, info);
+        renderDeviceCard(id, info);
+        updateBadge();
+    }
+
+    function renderDeviceCard(id, info) {
+        const containerId = `dcard-${CSS.escape(id)}`;
+        let card = document.querySelector(`[data-device-id="${CSS.escape(id)}"]`);
+
+        // Determine tags
+        const tags = [];
+        const isCorona = info.svcUUIDs.some(u => String(u).includes('fd6f'));
+        const isFindMy = info.mfrIds.includes(0x004C);
+        const isHighlight = (state.settings.highlightCorona && isCorona) ||
+                           (state.settings.highlightFindMy && isFindMy);
+
+        if (isCorona) tags.push({ text: 'Corona ENF', cls: 'tag-corona' });
+        if (isFindMy) tags.push({ text: 'Apple FindMy', cls: 'tag-findmy' });
+        info.mfrIds.forEach(mid => {
+            const name = KNOWN.manufacturers[mid];
+            if (name && mid !== 0x004C) tags.push({ text: name, cls: 'tag-mfr' });
+        });
+
+        if (!card) {
+            card = document.createElement('div');
+            card.className = `device-card${isHighlight ? ' highlight' : ''}`;
+            card.dataset.deviceId = id;
+            card.onclick = () => connectToSpecificDevice(info.device);
+
+            const empty = document.getElementById('scan-empty');
+            if (empty) empty.style.display = 'none';
+
+            document.getElementById('device-container').appendChild(card);
+        } else {
+            card.className = `device-card${isHighlight ? ' highlight' : ''}`;
+        }
+
+        // Build card content safely (no innerHTML)
+        card.textContent = '';
+
+        // Header row
+        const header = document.createElement('div');
+        header.className = 'dev-header';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'dev-name';
+        nameEl.textContent = info.name;
+
+        const rssiEl = document.createElement('div');
+        rssiEl.className = `dev-rssi ${rssiClass(info.rssi)}`;
+        rssiEl.textContent = info.rssi != null ? `${info.rssi} dBm` : '— dBm';
+
+        header.appendChild(nameEl);
+        header.appendChild(rssiEl);
+        card.appendChild(header);
+
+        // Meta
+        const meta = document.createElement('div');
+        meta.className = 'dev-meta';
+        meta.textContent = `ID: ${id.substring(0, 16)}…  ·  Gesehen: ${info.count}×`;
+        card.appendChild(meta);
+
+        // Tags
+        if (tags.length) {
+            const tagContainer = document.createElement('div');
+            tagContainer.className = 'dev-tags';
+            tags.forEach(t => {
+                const tagEl = document.createElement('span');
+                tagEl.className = `tag ${t.cls}`;
+                tagEl.textContent = t.text;
+                tagContainer.appendChild(tagEl);
             });
-            devicesFound.add(mac);
+            card.appendChild(tagContainer);
+        }
+    }
 
-            // 4. UPDATE UI
-            updateUI(rssi, mac, name, fullPayload, isSuspect, isApple);
+    function updateBadge() {
+        const badge = document.getElementById('badge-devices');
+        const count = state.devices.size;
+        if (count > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = count;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    // ═══════════════════════════════════════
+    //  GATT CONNECTION
+    // ═══════════════════════════════════════
+    async function connect() {
+        log('Öffne BLE-Picker für Verbindung...', 'info');
+
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: getOptionalServices()
+            });
+
+            await connectGATT(device);
+        } catch (e) {
+            if (e.name === 'NotFoundError') {
+                log('Verbindung abgebrochen — kein Gerät ausgewählt.', 'warn');
+            } else {
+                log(`Verbindungsfehler: ${e.message}`, 'error');
+                setStatus('Error', 'error');
+            }
+        }
+    }
+
+    async function connectToSpecificDevice(device) {
+        if (!device.gatt) {
+            log('Gerät unterstützt kein GATT.', 'warn');
+            return;
+        }
+        // Switch to GATT tab
+        const gattBtn = document.querySelector('[data-tab="tab-gatt"]');
+        switchTab(gattBtn);
+        await connectGATT(device);
+    }
+
+    async function connectGATT(device) {
+        try {
+            setStatus('Connecting', 'scanning');
+            log(`Verbinde zu: ${device.name || 'Unbekannt'}...`, 'info');
+
+            // Listen for disconnects
+            device.addEventListener('gattserverdisconnected', onDisconnected);
+
+            const server = await device.gatt.connect();
+            state.connectedDevice = device;
+            state.gattServer = server;
+
+            log(`GATT verbunden: ${device.name || device.id}`, 'ok');
+            setStatus('Connected', 'connected');
+
+            document.getElementById('btn-disconnect').disabled = false;
+            document.getElementById('btn-connect').disabled = true;
+
+            // Also add to radar if not present
+            addDeviceToRadar(device, null);
+
+            // Explore services
+            await exploreServices(server);
+
+        } catch (e) {
+            log(`GATT-Fehler: ${e.message}`, 'error');
+            setStatus('Error', 'error');
+        }
+    }
+
+    function onDisconnected(event) {
+        const name = event.target.name || 'Unbekannt';
+        log(`Gerät getrennt: ${name}`, 'warn');
+        setStatus('Disconnected', 'idle');
+
+        document.getElementById('btn-disconnect').disabled = true;
+        document.getElementById('btn-connect').disabled = false;
+
+        // Cleanup subscriptions
+        state.subscriptions.clear();
+
+        // Auto-reconnect?
+        if (state.settings.autoReconnect && state.connectedDevice) {
+            log('Auto-Reconnect in 3s...', 'info');
+            setTimeout(async () => {
+                if (state.connectedDevice) {
+                    try {
+                        await connectGATT(state.connectedDevice);
+                    } catch (e) {
+                        log(`Reconnect fehlgeschlagen: ${e.message}`, 'error');
+                    }
+                }
+            }, 3000);
+        }
+    }
+
+    async function disconnect() {
+        if (state.gattServer?.connected) {
+            state.gattServer.disconnect();
+        }
+        state.connectedDevice = null;
+        state.gattServer = null;
+        state.subscriptions.clear();
+
+        document.getElementById('btn-disconnect').disabled = true;
+        document.getElementById('btn-connect').disabled = false;
+
+        log('Verbindung manuell getrennt.', 'info');
+        setStatus('Idle', 'idle');
+    }
+
+    // ═══════════════════════════════════════
+    //  SERVICE DISCOVERY
+    // ═══════════════════════════════════════
+    async function exploreServices(server) {
+        const container = document.getElementById('gatt-container');
+        const empty = document.getElementById('gatt-empty');
+        if (empty) empty.style.display = 'none';
+
+        // Clear previous exploration
+        container.querySelectorAll('.gatt-service').forEach(el => el.remove());
+
+        let services;
+        try {
+            services = await server.getPrimaryServices();
+        } catch (e) {
+            log(`Service Discovery fehlgeschlagen: ${e.message}`, 'error');
+            return;
         }
 
-        function updateUI(rssi, mac, name, payload, isSuspect, isApple) {
-            // Throttling: Render visuals efficiently
-            uiPkg.innerText = db.length;
-            uiDev.innerText = devicesFound.size;
-            uiSus.innerText = suspectCount;
+        log(`${services.length} Services entdeckt.`, 'ok');
 
-            // Only render visual log for suspects OR strong signals OR every 10th packet (noise reduction)
-            const isRelevant = isSuspect || rssi > -70 || (db.length % 10 === 0);
+        for (const service of services) {
+            const svcInfo = KNOWN.services[service.uuid] || { name: service.uuid, tag: 'service' };
+            const svcEl = document.createElement('div');
+            svcEl.className = 'gatt-service';
 
-            if (!isRelevant) return;
+            // Service header
+            const headerEl = document.createElement('div');
+            headerEl.className = 'gatt-service-header';
 
-            // Maintain max lines
-            if (uiLog.childElementCount > 60) uiLog.lastElementChild.remove();
+            const nameText = document.createTextNode(svcInfo.name);
+            headerEl.appendChild(nameText);
 
-            const row = document.createElement('div');
-            row.className = 'log-entry';
-            if (isSuspect) row.classList.add('target-harman');
-            if (isApple && !isSuspect) row.classList.add('target-apple');
+            if (KNOWN.services[service.uuid]) {
+                const uuidLabel = document.createElement('span');
+                uuidLabel.className = 'svc-label';
+                uuidLabel.textContent = ` (${service.uuid.substring(4, 8).toUpperCase()})`;
+                headerEl.appendChild(uuidLabel);
+            }
 
-            let rssiClass = rssi > -60 ? 'strong' : (rssi > -80 ? 'med' : 'weak');
+            svcEl.appendChild(headerEl);
+            container.appendChild(svcEl);
 
-            row.innerHTML = `
-                <span class="meta">${mac.substr(0,14)}..</span>
-                <span class="rssi ${rssiClass}">${rssi}</span>
-                <span style="color:#fff; font-weight:bold;">${name !== "N/A" ? name : ""}</span>
-                <span class="payload">${payload || "EMPTY_PAYLOAD"}</span>
-            `;
+            // Explore characteristics
+            try {
+                const chars = await service.getCharacteristics();
+                for (const char of chars) {
+                    await renderCharacteristic(svcEl, char);
+                }
+            } catch (e) {
+                const errEl = document.createElement('div');
+                errEl.className = 'gatt-char';
+                errEl.style.color = 'var(--c-red)';
+                errEl.textContent = `Characteristics nicht lesbar: ${e.message}`;
+                svcEl.appendChild(errEl);
+                log(`Char-Fehler bei ${svcInfo.name}: ${e.message}`, 'warn');
+            }
+        }
+    }
 
-            uiLog.prepend(row);
+    async function renderCharacteristic(parent, char) {
+        const charEl = document.createElement('div');
+        charEl.className = 'gatt-char';
+        charEl.id = `char-${CSS.escape(char.uuid)}`;
+
+        // UUID + known name
+        const uuidEl = document.createElement('div');
+        uuidEl.className = 'char-uuid';
+        const knownName = KNOWN.characteristics[char.uuid];
+        uuidEl.textContent = knownName
+            ? `${knownName} (${char.uuid.substring(4, 8).toUpperCase()})`
+            : char.uuid;
+        charEl.appendChild(uuidEl);
+
+        // Properties tags
+        const propsEl = document.createElement('div');
+        propsEl.className = 'char-props';
+
+        const props = char.properties;
+        if (props.read)                    addTag(propsEl, 'READ', 'tag-read');
+        if (props.write)                   addTag(propsEl, 'WRITE', 'tag-write');
+        if (props.writeWithoutResponse)    addTag(propsEl, 'WRITE-NR', 'tag-write');
+        if (props.notify)                  addTag(propsEl, 'NOTIFY', 'tag-notify');
+        if (props.indicate)               addTag(propsEl, 'INDICATE', 'tag-notify');
+
+        charEl.appendChild(propsEl);
+
+        // Value display
+        const valueEl = document.createElement('div');
+        valueEl.className = 'char-value';
+        valueEl.id = `charval-${CSS.escape(char.uuid)}`;
+        valueEl.textContent = '⏳ Lesen...';
+        charEl.appendChild(valueEl);
+
+        // Action buttons
+        const actionsEl = document.createElement('div');
+        actionsEl.className = 'char-actions';
+
+        if (props.read) {
+            const readBtn = document.createElement('button');
+            readBtn.className = 'char-action-btn';
+            readBtn.textContent = '↻ Lesen';
+            readBtn.onclick = () => readCharValue(char, valueEl);
+            actionsEl.appendChild(readBtn);
         }
 
-        function exportCSV() {
-            if (db.length === 0) { alert("NO DATA TO EXPORT"); return; }
-
-            const header = ["Timestamp", "RSSI", "MAC_ID", "Name", "ManID", "Payload_Hex", "UUIDs", "TxPower"];
-            const rows = db.map(d => [
-                d.ts,
-                d.rssi,
-                d.mac,
-                `"${d.name}"`, // Quote names
-                d.manId,
-                d.fullPayload.replace(/,/g, "."), // Sanitize commas
-                d.uuids,
-                d.txPower
-            ].join(","));
-
-            const csvContent = [header.join(","), ...rows].join("\n");
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `BLE_DUMP_${new Date().getTime()}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+        if (props.notify || props.indicate) {
+            const notifyBtn = document.createElement('button');
+            notifyBtn.className = 'char-action-btn';
+            notifyBtn.textContent = '◉ Subscribe';
+            notifyBtn.onclick = () => toggleNotify(char, valueEl, notifyBtn);
+            actionsEl.appendChild(notifyBtn);
         }
-    </script>
+
+        charEl.appendChild(actionsEl);
+        parent.appendChild(charEl);
+
+        // Auto-read if readable
+        if (props.read) {
+            await readCharValue(char, valueEl);
+        }
+    }
+
+    function addTag(container, text, cls) {
+        const tag = document.createElement('span');
+        tag.className = `tag ${cls}`;
+        tag.textContent = text;
+        container.appendChild(tag);
+    }
+
+    async function readCharValue(char, valueEl) {
+        try {
+            const dataView = await char.readValue();
+            const bytes = safeBytes(dataView);
+            displayValue(valueEl, bytes);
+            log(`READ ${KNOWN.characteristics[char.uuid] || char.uuid.substring(4,8)}: ${bytesToHex(bytes)}`, 'data');
+        } catch (e) {
+            valueEl.textContent = `⚠ Lesefehler: ${e.message}`;
+            valueEl.style.color = 'var(--c-red)';
+        }
+    }
+
+    function displayValue(el, bytes) {
+        el.textContent = '';
+        el.style.color = '';
+
+        const text = bytesToText(bytes);
+        const hex = bytesToHex(bytes);
+
+        if (text) {
+            const txtLabel = document.createElement('span');
+            txtLabel.className = 'val-label';
+            txtLabel.textContent = 'TXT: ';
+            el.appendChild(txtLabel);
+            el.appendChild(document.createTextNode(`"${text}"\n`));
+        }
+
+        const hexLabel = document.createElement('span');
+        hexLabel.className = 'val-label';
+        hexLabel.textContent = 'HEX: ';
+        el.appendChild(hexLabel);
+        el.appendChild(document.createTextNode(hex));
+
+        // Special: single byte = might be battery level
+        if (bytes.length === 1) {
+            const pctLabel = document.createElement('span');
+            pctLabel.className = 'val-label';
+            pctLabel.textContent = `\nDEC: `;
+            el.appendChild(pctLabel);
+            el.appendChild(document.createTextNode(`${bytes[0]}`));
+        }
+    }
+
+    // ═══════════════════════════════════════
+    //  NOTIFICATIONS
+    // ═══════════════════════════════════════
+    async function toggleNotify(char, valueEl, btn) {
+        const isSubscribed = state.subscriptions.has(char.uuid);
+
+        if (isSubscribed) {
+            try {
+                await char.stopNotifications();
+                char.removeEventListener('characteristicvaluechanged', char._notifyHandler);
+                state.subscriptions.delete(char.uuid);
+                btn.classList.remove('subscribed');
+                btn.textContent = '◉ Subscribe';
+                log(`UNSUBSCRIBE ${char.uuid.substring(4,8)}`, 'info');
+            } catch (e) {
+                log(`Unsubscribe Fehler: ${e.message}`, 'error');
+            }
+        } else {
+            try {
+                char._notifyHandler = (event) => {
+                    const bytes = safeBytes(event.target.value);
+                    displayValue(valueEl, bytes);
+                    log(`NOTIFY ${char.uuid.substring(4,8)}: ${bytesToHex(bytes)}`, 'data');
+                };
+                char.addEventListener('characteristicvaluechanged', char._notifyHandler);
+                await char.startNotifications();
+                state.subscriptions.set(char.uuid, char);
+                btn.classList.add('subscribed');
+                btn.textContent = '■ Unsub';
+                log(`SUBSCRIBE ${char.uuid.substring(4,8)}`, 'ok');
+            } catch (e) {
+                log(`Subscribe Fehler: ${e.message}`, 'error');
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════
+    //  SETTINGS
+    // ═══════════════════════════════════════
+    function toggleSetting(el) {
+        const key = el.dataset.setting;
+        el.classList.toggle('on');
+        state.settings[key] = el.classList.contains('on');
+
+        try {
+            sessionStorage.setItem('ble-cmd-settings', JSON.stringify(state.settings));
+        } catch (_) {}
+
+        log(`Setting "${key}" → ${state.settings[key]}`, 'info');
+    }
+
+    // Restore toggle states on load
+    function initSettings() {
+        document.querySelectorAll('.toggle[data-setting]').forEach(el => {
+            const key = el.dataset.setting;
+            if (state.settings[key]) {
+                el.classList.add('on');
+            } else {
+                el.classList.remove('on');
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════
+    //  EXPORT
+    // ═══════════════════════════════════════
+    function exportLog(format = 'json') {
+        const deviceList = [];
+        state.devices.forEach((info, id) => {
+            deviceList.push({
+                id, name: info.name, rssi: info.rssi,
+                manufacturers: info.mfrIds, services: info.svcUUIDs,
+                count: info.count, lastSeen: new Date(info.lastSeen).toISOString()
+            });
+        });
+
+        let content, filename, mime;
+
+        if (format === 'json') {
+            const exportData = {
+                session: {
+                    exportedAt: new Date().toISOString(),
+                    userAgent: navigator.userAgent,
+                    devicesFound: state.devices.size,
+                },
+                devices: deviceList,
+                log: state.logEntries,
+            };
+            content = JSON.stringify(exportData, null, 2);
+            filename = `BLE_SESSION_${Date.now()}.json`;
+            mime = 'application/json';
+        } else {
+            const lines = state.logEntries.map(e => `[${e.ts}] [${e.level.toUpperCase()}] ${e.msg}`);
+            content = lines.join('\n');
+            filename = `BLE_LOG_${Date.now()}.txt`;
+            mime = 'text/plain';
+        }
+
+        const blob = new Blob([content], { type: mime });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        log(`Log exportiert: ${filename}`, 'ok');
+    }
+
+    function clearLog() {
+        state.logEntries = [];
+        document.getElementById('log-container').textContent = '';
+        log('Log gelöscht.', 'info');
+    }
+
+    function clearSession() {
+        state.devices.clear();
+        state.logEntries = [];
+        state.subscriptions.clear();
+
+        document.getElementById('device-container').textContent = '';
+        document.getElementById('log-container').textContent = '';
+        document.getElementById('gatt-container').querySelectorAll('.gatt-service').forEach(el => el.remove());
+
+        // Restore empty states
+        restoreEmptyStates();
+        updateBadge();
+        sessionStorage.removeItem('ble-cmd-settings');
+
+        log('Session zurückgesetzt.', 'warn');
+    }
+
+    function restoreEmptyStates() {
+        ['scan-empty', 'gatt-empty'].forEach(id => {
+            let el = document.getElementById(id);
+            if (!el) return;
+            el.style.display = '';
+        });
+    }
+
+    // ═══════════════════════════════════════
+    //  CHECK BROWSER SUPPORT
+    // ═══════════════════════════════════════
+    function checkSupport() {
+        if (!navigator.bluetooth) {
+            log('⚠ Web Bluetooth API nicht verfügbar!', 'error');
+            log('Nutze Chrome/Edge auf Android oder Desktop mit aktiviertem Flag.', 'warn');
+            setStatus('No BLE', 'error');
+            document.getElementById('btn-scan').disabled = true;
+            document.getElementById('btn-connect').disabled = true;
+            return false;
+        }
+        log('Web Bluetooth API verfügbar.', 'ok');
+
+        if ('requestLEScan' in navigator.bluetooth) {
+            log('Passive Scan (requestLEScan) verfügbar.', 'ok');
+        } else {
+            log('Passive Scan nicht verfügbar — nutze Device-Picker Modus.', 'info');
+        }
+
+        return true;
+    }
+
+    // ═══════════════════════════════════════
+    //  INIT
+    // ═══════════════════════════════════════
+    function init() {
+        initSettings();
+        checkSupport();
+        log('BLE Command Center bereit.', 'ok');
+    }
+
+    // Run on load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    // ─── Public API ───
+    return {
+        scan,
+        connect,
+        disconnect,
+        switchTab,
+        toggleSetting,
+        exportLog,
+        clearLog,
+        clearSession,
+    };
+})();
+</script>
 </body>
 </html>
